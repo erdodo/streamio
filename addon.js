@@ -16,30 +16,61 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.0.0",
+    "version": "1.0.2",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
+    "logo": "https://via.placeholder.com/256x256/ff6b35/ffffff?text=ErdoFlix",
+    "background": "https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=ErdoFlix+Background",
 
     "types": ["movie"],
 
     "catalogs": [
         {
             "type": "movie",
-            "id": "erdoflix_movies",
-            "name": "ErdoFlix Filmler"
+            "id": "erdoflix_movies", 
+            "name": "ErdoFlix Filmler",
+            "extra": [
+                {
+                    "name": "genre",
+                    "options": ["aksiyon", "komedi", "dram", "korku", "bilim kurgu"],
+                    "isRequired": false
+                },
+                {
+                    "name": "skip",
+                    "isRequired": false
+                }
+            ]
+        },
+        {
+            "type": "movie",
+            "id": "erdoflix_top",
+            "name": "ErdoFlix Popüler",
+            "extra": [
+                {
+                    "name": "skip", 
+                    "isRequired": false
+                }
+            ]
         }
     ],
 
     "resources": [
         "catalog",
-        "meta",
+        "meta", 
         {
             "name": "stream",
             "types": ["movie"],
             "idPrefixes": ["ey"]
         }
-    ]
+    ],
+
+    "behaviorHints": {
+        "adult": false,
+        "p2p": false,
+        "configurable": false,
+        "configurationRequired": false
+    }
 };
 
 // API Helper Functions
@@ -127,15 +158,27 @@ const builder = new addonBuilder(manifest);
 builder.defineCatalogHandler(async function(args) {
     console.log(`Catalog istegi: ${JSON.stringify(args)}`);
 
-    if (args.type !== 'movie' || args.id !== 'erdoflix_movies') {
+    if (args.type !== 'movie' || !['erdoflix_movies', 'erdoflix_top'].includes(args.id)) {
         return Promise.resolve({ metas: [] });
     }
 
     try {
-        const movies = await fetchMovies(200); // Meta ile aynı limit
-        console.log(`${movies.length} film catalog için hazırlanıyor`);
+        // Skip parametresi için sayfalama
+        const skip = parseInt(args.extra?.skip) || 0;
+        const pageSize = args.id === 'erdoflix_top' ? 20 : 50; // Popüler için daha az
+        
+        const movies = await fetchMovies(300);
+        console.log(`${movies.length} film alındı, catalog: ${args.id}, skip: ${skip}`);
 
-        const metas = movies.map(movie => ({
+        // Popüler catalog için tersten sırala (en yeni önce)
+        let processedMovies = args.id === 'erdoflix_top' 
+            ? movies.slice().reverse() 
+            : movies;
+
+        // Sayfalama uygula
+        const paginatedMovies = processedMovies.slice(skip, skip + pageSize);
+        
+        const metas = paginatedMovies.map(movie => ({
             id: `ey${movie.id}`,
             type: 'movie',
             name: movie.baslik || movie.orjinal_baslik || `Film ${movie.id}`,
@@ -145,25 +188,38 @@ builder.defineCatalogHandler(async function(args) {
             releaseInfo: movie.yayin_tarihi || undefined,
             year: movie.yayin_tarihi ? new Date(movie.yayin_tarihi).getFullYear() : undefined,
             country: 'TR',
-            language: 'tr'
+            language: 'tr',
+            // Ana sayfa için ek meta bilgiler
+            genre: ['film'],
+            runtime: undefined,
+            imdbRating: undefined,
+            // Popüler catalog için öncelik
+            ...(args.id === 'erdoflix_top' && { featured: true })
         }));
 
-        console.log(`Catalog'da ${metas.length} film döndürülüyor`);
-        return Promise.resolve({ metas: metas });
+        console.log(`Catalog '${args.id}'da ${metas.length} film döndürülüyor (skip: ${skip})`);
+        return Promise.resolve({ 
+            metas: metas,
+            cacheMaxAge: args.id === 'erdoflix_top' ? 3600 : 1800 // Popüler için daha uzun cache
+        });
     } catch (error) {
         console.log(`Catalog hatası: ${error.message}`);
         return Promise.resolve({ metas: [] });
     }
 });
 
-// Meta handler - Film detaylarını döndürür
+// Meta handler - Film detaylarını döndürür (İzleme geçmişi için kritik)
 builder.defineMetaHandler(async function(args) {
+    console.log(`Meta handler çağrıldı: ${JSON.stringify(args)}`);
+    
     if (args.type !== 'movie') {
+        console.log(`Desteklenmeyen tip: ${args.type}`);
         return Promise.resolve({ meta: {} });
     }
 
     // ID'den film ID'sini çıkar (ey prefix'ini kaldır)
     if (!args.id.startsWith('ey')) {
+        console.log(`Geçersiz ID formatı: ${args.id}`);
         return Promise.resolve({ meta: {} });
     }
 
@@ -171,43 +227,60 @@ builder.defineMetaHandler(async function(args) {
     console.log(`Film ${movieId} için meta bilgisi aranıyor`);
 
     try {
-        // Önce cache'den kontrol et, sonra API'den al
-        const movies = await fetchMovies(200); // Daha fazla film al
+        // API'den filmleri al
+        const movies = await fetchMovies(300);
         const targetMovie = movies.find(movie => movie.id.toString() === movieId);
 
         if (!targetMovie) {
-            console.log(`Film ${movieId} bulunamadı`);
+            console.log(`Film ${movieId} bulunamadı, toplam ${movies.length} film var`);
             return Promise.resolve({ meta: {} });
         }
 
-        // Meta bilgilerini daha detaylı doldur
+        // İzleme geçmişi için gerekli tüm alanları doldur
+        const movieName = targetMovie.baslik || targetMovie.orjinal_baslik || `Film ${movieId}`;
+        const moviePoster = targetMovie.poster || `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
+        
         const meta = {
-            id: args.id,
+            id: args.id, // Tam ID (ey prefix'li)
             type: 'movie',
-            name: targetMovie.baslik || targetMovie.orjinal_baslik || `Film ${movieId}`,
-            poster: targetMovie.poster || undefined,
-            background: targetMovie.arka_plan || undefined,
-            description: targetMovie.detay || undefined,
+            name: movieName, // ZORUNLU - İzleme geçmişi için
+            poster: moviePoster, // ZORUNLU - İzleme geçmişi için
+            background: targetMovie.arka_plan || moviePoster,
+            description: targetMovie.detay || `${movieName} film detayları`,
             releaseInfo: targetMovie.yayin_tarihi || undefined,
-            year: targetMovie.yayin_tarihi ? new Date(targetMovie.yayin_tarihi).getFullYear() : undefined,
+            year: targetMovie.yayin_tarihi ? new Date(targetMovie.yayin_tarihi).getFullYear() : new Date().getFullYear(),
             imdbRating: undefined,
-            genres: undefined,
+            genres: ['Film'],
             runtime: undefined,
             director: undefined,
             cast: undefined,
             country: 'TR',
             language: 'tr',
-            // Poster yoksa placeholder ekle
-            ...((!targetMovie.poster || targetMovie.poster === '') && {
-                poster: `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(targetMovie.baslik || 'Film')}`
-            })
+            // İzleme geçmişi için ek bilgiler
+            website: undefined,
+            awards: undefined,
+            writer: undefined,
+            videos: []
         };
 
-        console.log(`Film ${movieId} meta bilgisi döndürülüyor: "${meta.name}" - Poster: ${meta.poster ? 'Var' : 'Yok'}`);
-        return Promise.resolve({ meta: meta });
+        console.log(`✅ Film ${movieId} meta başarılı: "${meta.name}" | Poster: ${meta.poster ? 'Var' : 'Yok'}`);
+        console.log(`Meta detayları: ID=${meta.id}, Name="${meta.name}", Type=${meta.type}`);
+        
+        return Promise.resolve({ 
+            meta: meta,
+            cacheMaxAge: 3600 // 1 saat cache
+        });
     } catch (error) {
-        console.log(`Meta hatası: ${error.message}`);
-        return Promise.resolve({ meta: {} });
+        console.log(`❌ Meta hatası Film ${movieId}: ${error.message}`);
+        // Hata durumunda bile basit meta döndür
+        return Promise.resolve({ 
+            meta: {
+                id: args.id,
+                type: 'movie',
+                name: `Film ${movieId}`,
+                poster: `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=Film+${movieId}`
+            }
+        });
     }
 });
 

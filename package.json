@@ -1,6 +1,6 @@
 {
   "name": "erdoflix-addon",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ErdoFlix M3U8 Stremio Addon",
   "main": "server.js",
   "scripts": {
