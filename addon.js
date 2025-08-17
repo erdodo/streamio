@@ -42,7 +42,7 @@ const manifest = {
 };
 
 // API Helper Functions
-async function fetchMovies(limit = 100) {
+async function fetchMovies(limit = 1000) {
     try {
         const filterParam = encodeURIComponent('{}');
         const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}`;
@@ -187,22 +187,22 @@ builder.defineStreamHandler(async function(args) {
                 if (subtitle.url) {
                     const sub = {
                         url: subtitle.url,
-                        lang: 'tr' // Varsayılan Türkçe
+                        lang: subtitle.baslik // Varsayılan Türkçe
                     };
-                    
+
                     // VTT formatını belirt
                     if (subtitle.url.toLowerCase().includes('.vtt')) {
                         sub.format = 'vtt';
                     } else if (subtitle.url.toLowerCase().includes('.srt')) {
                         sub.format = 'srt';
                     }
-                    
+
                     if (subtitle.baslik) {
                         sub.label = subtitle.baslik;
                     } else {
                         sub.label = 'Türkçe';
                     }
-                    
+
                     stream.subtitles.push(sub);
                 }
             }
