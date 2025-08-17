@@ -3,7 +3,7 @@ const express = require("express");
 const path = require("path");
 
 const addonInterface = require("./addon");
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3002;
 
 // Express app oluştur
 const app = express();
@@ -19,11 +19,11 @@ app.get('/', (req, res) => {
 // Debug endpoint - film ve altyazı durumunu kontrol et
 app.get('/debug/movie/:id', async (req, res) => {
     const movieId = req.params.id;
-    
+
     try {
         // Addon'dan helper fonksiyonları kullan
         const addon = require('./addon');
-        
+
         res.json({
             movieId: movieId,
             timestamp: new Date().toISOString(),
