@@ -97,20 +97,20 @@
         <div class="logo">🎬</div>
         <h1>ErdoFlix</h1>
         <p class="subtitle">M3U8 Kaynakları için Stremio Addon'u</p>
-        
+
         <a href="https://app.strem.io/shell-v4.4/#/addons?addon=MANIFEST_URL" class="install-btn" id="web-install">
             🌐 Web'den Yükle
         </a>
-        
+
         <a href="stremio://MANIFEST_URL" class="install-btn protocol-btn" id="app-install">
             📱 Uygulama'dan Yükle
         </a>
-        
+
         <div class="info">
             <h3>📋 Addon Bilgileri</h3>
             <p><strong>Manifest URL:</strong></p>
             <div class="manifest-url" id="manifest-url">Loading...</div>
-            
+
             <h3>✨ Özellikler</h3>
             <ul class="features">
                 <li>🎥 M3U8 video kaynakları</li>
@@ -118,7 +118,7 @@
                 <li>📝 Türkçe altyazı desteği</li>
                 <li>🚀 Hızlı stream erişimi</li>
             </ul>
-            
+
             <h3>🔧 Nasıl Kullanılır?</h3>
             <p>1. Yukarıdaki butona tıklayın</p>
             <p>2. Stremio'da addon'u yükleyin</p>
@@ -131,14 +131,14 @@
         // Manifest URL'ini dinamik olarak ayarla
         const manifestUrl = window.location.origin + '/manifest.json';
         document.getElementById('manifest-url').textContent = manifestUrl;
-        
+
         // Linkleri güncelle
         const webInstallBtn = document.getElementById('web-install');
         const appInstallBtn = document.getElementById('app-install');
-        
+
         webInstallBtn.href = `https://app.strem.io/shell-v4.4/#/addons?addon=${encodeURIComponent(manifestUrl)}`;
         appInstallBtn.href = `stremio://${manifestUrl}`;
-        
+
         // Kopyalama fonksiyonu
         document.getElementById('manifest-url').addEventListener('click', function() {
             navigator.clipboard.writeText(manifestUrl).then(function() {

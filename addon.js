@@ -42,19 +42,20 @@ const manifest = {
 };
 
 // API Helper Functions
-async function fetchMovies() {
+async function fetchMovies(limit = 100) {
     try {
         const filterParam = encodeURIComponent('{}');
-        const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}`;
+        const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}`;
         console.log(`API'ye istek gönderiliyor: ${url}`);
 
         const response = await axios.get(url, {
             headers: API_HEADERS,
-            timeout: 5000
+            timeout: 10000
         });
 
         console.log(`API yanıtı: ${response.status}`);
         console.log(`API'den ${response.data.data?.length || 0} film alındı`);
+        console.log(`Toplam film sayısı: ${response.data.meta?.count || 'bilinmiyor'}`);
         return response.data.data || [];
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
@@ -71,15 +72,21 @@ async function fetchMovies() {
 async function fetchMovieSources(movieId) {
     try {
         const filterParam = encodeURIComponent(`{"kaynak_id":${movieId}}`);
-        const url = `${API_BASE_URL}/film_kaynaklari:list?filter=${filterParam}`;
+        const timestamp = Date.now();
+        const url = `${API_BASE_URL}/film_kaynaklari:list?filter=${filterParam}&_t=${timestamp}`;
         console.log(`Film kaynakları alınıyor: ${url}`);
 
         const response = await axios.get(url, {
-            headers: API_HEADERS,
+            headers: {
+                ...API_HEADERS,
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
             timeout: 5000
         });
 
         console.log(`Kaynak yanıtı: ${response.status}`);
+        console.log(`Film ${movieId} için ${response.data.data?.length || 0} kaynak bulundu`);
         return response.data.data || [];
     } catch (error) {
         console.log(`Film kaynakları alınırken hata: ${error.message}`);
@@ -90,15 +97,22 @@ async function fetchMovieSources(movieId) {
 async function fetchMovieSubtitles(movieId) {
     try {
         const filterParam = encodeURIComponent(`{"film_id":${movieId}}`);
-        const url = `${API_BASE_URL}/film_altyazilari:list?filter=${filterParam}`;
+        // Cache busting için timestamp ekle
+        const timestamp = Date.now();
+        const url = `${API_BASE_URL}/film_altyazilari:list?filter=${filterParam}&_t=${timestamp}`;
         console.log(`Film altyazıları alınıyor: ${url}`);
 
         const response = await axios.get(url, {
-            headers: API_HEADERS,
+            headers: {
+                ...API_HEADERS,
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
             timeout: 5000
         });
 
         console.log(`Altyazı yanıtı: ${response.status}`);
+        console.log(`Film ${movieId} için ${response.data.data?.length || 0} altyazı bulundu`);
         return response.data.data || [];
     } catch (error) {
         console.log(`Film altyazıları alınırken hata: ${error.message}`);
@@ -175,13 +189,25 @@ builder.defineStreamHandler(async function(args) {
                         url: subtitle.url,
                         lang: 'tr' // Varsayılan Türkçe
                     };
+                    
+                    // VTT formatını belirt
+                    if (subtitle.url.toLowerCase().includes('.vtt')) {
+                        sub.format = 'vtt';
+                    } else if (subtitle.url.toLowerCase().includes('.srt')) {
+                        sub.format = 'srt';
+                    }
+                    
                     if (subtitle.baslik) {
                         sub.label = subtitle.baslik;
+                    } else {
+                        sub.label = 'Türkçe';
                     }
+                    
                     stream.subtitles.push(sub);
                 }
             }
 
+            console.log(`Kaynak "${stream.title}" için ${stream.subtitles.length} altyazı eklendi`);
             streams.push(stream);
         }
 
