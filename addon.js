@@ -33,6 +33,7 @@ const manifest = {
 
     "resources": [
         "catalog",
+        "meta",
         {
             "name": "stream",
             "types": ["movie"],
@@ -147,6 +148,54 @@ builder.defineCatalogHandler(async function(args) {
     } catch (error) {
         console.log(`Catalog hatası: ${error.message}`);
         return Promise.resolve({ metas: [] });
+    }
+});
+
+// Meta handler - Film detaylarını döndürür
+builder.defineMetaHandler(async function(args) {
+    if (args.type !== 'movie') {
+        return Promise.resolve({ meta: {} });
+    }
+
+    // ID'den film ID'sini çıkar (ey prefix'ini kaldır)
+    if (!args.id.startsWith('ey')) {
+        return Promise.resolve({ meta: {} });
+    }
+
+    const movieId = args.id.substring(2); // 'ey' prefix'ini kaldır
+    console.log(`Film ${movieId} için meta bilgisi aranıyor`);
+
+    try {
+        const movies = await fetchMovies(1000);
+        const targetMovie = movies.find(movie => movie.id.toString() === movieId);
+
+        if (!targetMovie) {
+            console.log(`Film ${movieId} bulunamadı`);
+            return Promise.resolve({ meta: {} });
+        }
+
+        const meta = {
+            id: args.id,
+            type: 'movie',
+            name: targetMovie.baslik || targetMovie.orjinal_baslik || `Film ${movieId}`,
+            poster: targetMovie.poster || undefined,
+            background: targetMovie.arka_plan || undefined,
+            description: targetMovie.detay || undefined,
+            releaseInfo: targetMovie.yayin_tarihi || undefined,
+            imdbRating: undefined,
+            genres: undefined,
+            runtime: undefined,
+            director: undefined,
+            cast: undefined,
+            country: undefined,
+            language: 'tr'
+        };
+
+        console.log(`Film ${movieId} meta bilgisi döndürülüyor: ${meta.name}`);
+        return Promise.resolve({ meta: meta });
+    } catch (error) {
+        console.log(`Meta hatası: ${error.message}`);
+        return Promise.resolve({ meta: {} });
     }
 });
 

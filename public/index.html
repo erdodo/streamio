@@ -124,6 +124,10 @@
             <p>2. Stremio'da addon'u yükleyin</p>
             <p>3. Discover > Movies > ErdoFlix Filmler</p>
             <p>4. Film seçip izlemeye başlayın!</p>
+            
+            <h3>🧪 Test Linkleri</h3>
+            <p><a href="#" id="test-movie-link" target="_blank">📽️ Test Filmi (ey12) Aç</a></p>
+            <p><small>Bu link addon yüklü Stremio'da film detayını açar</small></p>
         </div>
     </div>
 
@@ -135,9 +139,11 @@
         // Linkleri güncelle
         const webInstallBtn = document.getElementById('web-install');
         const appInstallBtn = document.getElementById('app-install');
+        const testMovieLink = document.getElementById('test-movie-link');
 
         webInstallBtn.href = `https://app.strem.io/shell-v4.4/#/addons?addon=${encodeURIComponent(manifestUrl)}`;
         appInstallBtn.href = `stremio://${manifestUrl}`;
+        testMovieLink.href = `https://app.strem.io/shell-v4.4/#/detail/movie/ey12?addon=${encodeURIComponent(manifestUrl)}`;
 
         // Kopyalama fonksiyonu
         document.getElementById('manifest-url').addEventListener('click', function() {
