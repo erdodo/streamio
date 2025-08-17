@@ -125,22 +125,27 @@ const builder = new addonBuilder(manifest);
 
 // Catalog handler - Film listesini döndürür
 builder.defineCatalogHandler(async function(args) {
+    console.log(`Catalog istegi: ${JSON.stringify(args)}`);
+
     if (args.type !== 'movie' || args.id !== 'erdoflix_movies') {
         return Promise.resolve({ metas: [] });
     }
 
     try {
-        const movies = await fetchMovies();
+        const movies = await fetchMovies(200); // Meta ile aynı limit
+        console.log(`${movies.length} film catalog için hazırlanıyor`);
+
         const metas = movies.map(movie => ({
             id: `ey${movie.id}`,
             type: 'movie',
             name: movie.baslik || movie.orjinal_baslik || `Film ${movie.id}`,
-            poster: movie.poster || undefined,
+            poster: movie.poster || `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(movie.baslik || 'Film')}`,
             background: movie.arka_plan || undefined,
             description: movie.detay || undefined,
             releaseInfo: movie.yayin_tarihi || undefined,
-            imdbRating: undefined,
-            genres: undefined
+            year: movie.yayin_tarihi ? new Date(movie.yayin_tarihi).getFullYear() : undefined,
+            country: 'TR',
+            language: 'tr'
         }));
 
         console.log(`Catalog'da ${metas.length} film döndürülüyor`);
@@ -166,7 +171,8 @@ builder.defineMetaHandler(async function(args) {
     console.log(`Film ${movieId} için meta bilgisi aranıyor`);
 
     try {
-        const movies = await fetchMovies(1000);
+        // Önce cache'den kontrol et, sonra API'den al
+        const movies = await fetchMovies(200); // Daha fazla film al
         const targetMovie = movies.find(movie => movie.id.toString() === movieId);
 
         if (!targetMovie) {
@@ -174,6 +180,7 @@ builder.defineMetaHandler(async function(args) {
             return Promise.resolve({ meta: {} });
         }
 
+        // Meta bilgilerini daha detaylı doldur
         const meta = {
             id: args.id,
             type: 'movie',
@@ -182,16 +189,21 @@ builder.defineMetaHandler(async function(args) {
             background: targetMovie.arka_plan || undefined,
             description: targetMovie.detay || undefined,
             releaseInfo: targetMovie.yayin_tarihi || undefined,
+            year: targetMovie.yayin_tarihi ? new Date(targetMovie.yayin_tarihi).getFullYear() : undefined,
             imdbRating: undefined,
             genres: undefined,
             runtime: undefined,
             director: undefined,
             cast: undefined,
-            country: undefined,
-            language: 'tr'
+            country: 'TR',
+            language: 'tr',
+            // Poster yoksa placeholder ekle
+            ...((!targetMovie.poster || targetMovie.poster === '') && {
+                poster: `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(targetMovie.baslik || 'Film')}`
+            })
         };
 
-        console.log(`Film ${movieId} meta bilgisi döndürülüyor: ${meta.name}`);
+        console.log(`Film ${movieId} meta bilgisi döndürülüyor: "${meta.name}" - Poster: ${meta.poster ? 'Var' : 'Yok'}`);
         return Promise.resolve({ meta: meta });
     } catch (error) {
         console.log(`Meta hatası: ${error.message}`);
