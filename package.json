@@ -1,0 +1,34 @@
+{
+  "name": "erdoflix-addon",
+  "version": "1.0.0",
+  "description": "ErdoFlix M3U8 Stremio Addon",
+  "main": "server.js",
+  "scripts": {
+    "test": "node test/*",
+    "start": "node server.js",
+    "dev": "node server.js",
+    "vercel-build": "echo 'Build complete'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Stremio/addon-helloworld"
+  },
+  "keywords": [
+    "stremio",
+    "stremio-addons",
+    "addons",
+    "erdoflix",
+    "m3u8"
+  ],
+  "author": "Erdogan Yesil",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Stremio/addon-helloworld/issues"
+  },
+  "homepage": "https://github.com/Stremio/addon-helloworld",
+  "dependencies": {
+    "axios": "^1.5.0",
+    "express": "^4.21.2",
+    "stremio-addon-sdk": "^1.1.0"
+  }
+}

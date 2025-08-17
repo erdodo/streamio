@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "serverless.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/serverless.js"
+    }
+  ],
+  "functions": {
+    "serverless.js": {
+      "maxDuration": 30
+    }
+  }
+}

@@ -1,328 +1,215 @@
-# Hello world add-on for Stremio in Python
+# Hello world add-on for Stremio
 
-## Adds a few public domain movies to Stremio
+### Adds a few public domain movies to Stremio
 
-This example shows how to make a Stremio Add-on in Python with Rack.
+This example shows how to make a Stremio Add-on with Stremio's [Add-on SDK](https://github.com/Stremio/stremio-addon-sdk).
+
+Alternatively, you can also see how to make a Stremio Add-on with the [Express](https://www.npmjs.com/package/express) NPM module at [Stremio Express Add-on Hello World](https://github.com/Stremio/addon-helloworld-express), or explore our [many other examples](https://github.com/Stremio/stremio-addon-sdk/tree/master/docs/examples).
+
 
 ## Quick Start
 
-Clone or download this repo and run the following commands in the repo's root directory:
-
-```sh
-pip install flask
-python3 stremio-addon.py
+```bash
+npm install
+npm start
 ```
+
+Then run Stremio, click the add-on button (puzzle piece icon) on the top right, and write `http://127.0.0.1:7000/manifest.json` in the "Addon Url" field on the top left.
+
 
 ## Basic tutorial on how to re-create this add-on step by step
 
-## Step 1: init a project
+Step 1: init a npm project
+=========================
 
-### Pre-requisites: git, pyton3, pip
+**Pre-requisites: Node.js, Git**
 
-This is the first, boilerplate step of creating an add-on for Stremio.
+This is the first, boilerplate step of creating an add-on for Stremio. Create a node.js project and add the [stremio-addons](http://github.com/Stremio/stremio-addons) module as dependency.
 
-```sh
+```bash
 mkdir stremio-hello-world
 cd stremio-hello-world
-git init
+npm init
+npm install --save stremio-addon-sdk@1.0.x
 git add *
 git commit -a -m "initial commit"
 ```
 
-## Step 2: Create `stremio-addon.py`
+**NOTE:** to test this add-on, you need to complete Step 6. Start the add-on with `node server.js` and add the add-on to stremio by going to the *Addons* page (top right icon) and typing `http://127.0.0.1:7000/manifest.json` in the text field in the top left and pressing enter.
 
-Let's start with our add-on basic functionality. Create `stremio-addon.py` with the following contents:
+Step 2: Create addon.js, fill manifest
+===========================
 
-```python
-from flask import Flask, Response, jsonify, url_for, abort
-from functools import wraps
+In this step, we define the add-on name, description and purpose.
 
-MANIFEST = {
-    'id': 'org.stremio.helloworldPython',
-    'version': '1.0.0',
+Create an `addon.js` file:
+```javascript
+const { addonBuilder } = require("stremio-addon-sdk");
 
-    'name': 'Hello World Python Addon',
-    'description': 'Sample addon made with Flask providing a few public domain movies',
+const manifest = {
+    "id": "org.stremio.helloworld",
+    "version": "1.0.0",
 
-    'types': ['movie', 'series'],
+    "name": "Hello World Addon",
+    "description": "Sample addon providing a few public domain movies",
 
-    'catalogs': [],
+    //"icon": "URL to 256x256 monochrome png icon",
+    //"background": "URL to 1024x786 png/jpg background",
 
-    'resources': []
-}
+    // set what type of resources we will return
+    "resources": [
+        "catalog",
+        "stream"
+    ],
 
-app = Flask(__name__)
+    "types": ["movie", "series"], // your add-on will be preferred for these content types
 
+    // set catalogs, we'll have 2 catalogs in this case, 1 for movies and 1 for series
+    "catalogs": [
+        {
+            type: 'movie',
+            id: 'helloworldmovies'
+        },
+        {
+            type: 'series',
+            id: 'helloworldseries'
+        }
+    ],
 
-def respond_with(data):
-    resp = jsonify(data)
-    resp.headers['Access-Control-Allow-Origin'] = '*'
-    resp.headers['Access-Control-Allow-Headers'] = '*'
-    return resp
+    // prefix of item IDs (ie: "tt0032138")
+    "idPrefixes": [ "tt" ]
 
-
-@app.route('/manifest.json')
-def addon_manifest():
-    return respond_with(MANIFEST)
-
-if __name__ == '__main__':
-    app.run()
+};
 ```
 
-`respond_with` is a helper function that builds the response object and sets the required headers.
+Step 3: init an add-on server
+============================
 
-The manifest is the most important part of our add-on. It tells Stremio what are the add-on's capabilities. We define an `MANIFEST` object in the beginning of our scrip and the `Manifest` class serves it statically. The full specification of the add-on manifest is described [here](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/manifest.md).
-
-Now we can test that everything is working by running:
-
-```shell
-python3 stremio-addon.py
+Add to your addon.js:
+```javascript
+const builder = new addonBuilder(manifest);
 ```
 
-In the output you'll see a linke like this
+Step 4: basic streaming
+==============================
 
-> Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+To implement basic streaming, we will set-up a dummy dataset with a few public domain movies.
 
-Now go to [http://127.0.0.1:5000/manifest.json](http://127.0.0.1:5000/manifest.json) and check if the add-on manifest is served correctly.
-
-You can stop the add-on by pressing <kbd>Ctrl</kbd>+<kbd>C</kbd>.
-
-## Step 3: Basic streaming
-
-First let's update our manifest, so Stremio will know that our add-on support streams. Change the `resources` section of the manifest from:
-
-```python
-  'resources': []
+```javascript
+const dataset = {
+    // Some examples of streams we can serve back to Stremio ; see https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/stream.md
+    "tt0051744": { name: "House on Haunted Hill", type: "movie", infoHash: "9f86563ce2ed86bbfedd5d3e9f4e55aedd660960" }, // torrent
+    "tt1254207": { name: "Big Buck Bunny", type: "movie", url: "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4" }, // HTTP stream
+    "tt0031051": { name: "The Arizone Kid", type: "movie", ytId: "m3BKVSpP80s" }, // YouTube stream
+    "tt0137523": { name: "Fight Club", type: "movie", externalUrl: "https://www.netflix.com/watch/26004747" }, // redirects to Netflix
+    "tt1748166:1:1": { name: "Pioneer One", type: "series", infoHash: "07a9de9750158471c3302e4e95edb1107f980fa6" }, // torrent for season 1, episode 1
+};
 ```
 
-to this:
+And then implement ``defineStreamHandler`` as follows:
 
-```python
-    'resources': [
-        {'name': 'stream', 'types': [
-            'movie', 'series'], 'idPrefixes': ['tt', 'hpy']}
-    ]
-```
-
-To implement basic streaming, we will define a hash with a few public domain movies, just after the manifest definition.
-
-```python
-STREAMS = {
-    'movie': {
-        'tt0032138': [
-            {'title': 'Torrent',
-                'infoHash': '24c8802e2624e17d46cd555f364debd949f2c81e', 'fileIdx': 0}
-        ],
-        'tt0017136': [
-            {'title': 'Torrent',
-                'infoHash': 'dca926c0328bb54d209d82dc8a2f391617b47d7a', 'fileIdx': 1}
-        ],
-        'tt0051744': [
-            {'title': 'Torrent', 'infoHash': '9f86563ce2ed86bbfedd5d3e9f4e55aedd660960'}
-        ],
-        'tt1254207': [
-            {'title': 'HTTP URL', 'url': 'http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4'}
-        ],
-        'tt0031051': [
-            {'title': 'YouTube', 'ytId': 'm3BKVSpP80s'}
-        ],
-        'tt0137523': [
-            {'title': 'External URL',
-                'externalUrl': 'https://www.netflix.com/watch/26004747'}
-        ]
-    },
-
-    'series': {
-        'tt1748166:1:1': [
-            {'title': 'Torrent', 'infoHash': '07a9de9750158471c3302e4e95edb1107f980fa6'}
-        ],
-
-        'hpytt0147753:1:1': [
-            {'title': 'YouTube', 'ytId': '5EQw5NYlbyE'}
-        ],
-        'hpytt0147753:1:2': [
-            {'title': 'YouTube', 'ytId': 'ZzdBKcVzx9Y'}
-        ]
+```javascript
+// Streams handler
+builder.defineStreamHandler(function(args) {
+    if (dataset[args.id]) {
+        return Promise.resolve({ streams: [dataset[args.id]] });
+    } else {
+        return Promise.resolve({ streams: [] });
     }
-}
+})
 ```
 
-And then implement the `/stream/` path.
+**As you can see, this is an add-on that allows Stremio to stream 4 public domain movies and 1 series episode - in very few lines of code.**
 
-```python
-@app.route('/stream/<type>/<id>.json')
-def addon_stream(type, id):
-    if type not in MANIFEST['types']:
-        abort(404)
+Depending on your source, you can implement streaming (`defineStreamHandler`) or catalogs (`defineCatalogHandler`) of ``movie``, ``series``, ``channel`` or ``tv`` content types.
 
-    streams = {'streams': []}
-    if type in STREAMS and id in STREAMS[type]:
-        streams['streams'] = STREAMS[type][id]
-    return respond_with(streams)
-```
+To load that add-on in the desktop Stremio, click the add-on button (puzzle piece icon) on the top right, and write `http://127.0.0.1:7000/manifest.json` in the "Addon Repository Url" field on the top left.
 
-**As you can see, this is an add-on that allows Stremio to stream 6 public domain movies and 3 series episode - in very few lines of code.**
+Step 5: implement catalog
+==============================
 
-Depending on your source, you can implement streaming (/stream/) or catalogs (/catalog/) of movie, series, channel or tv content types.
+We have 2 methods serving meta:
 
-To load that add-on in the desktop Stremio, start the add-on, as described above, then click the add-on button (puzzle piece icon) on the top right, and write [http://127.0.0.1:9292/manifest.json](http://127.0.0.1:9292/manifest.json) in the "Addo-n Repository Url" field on the top left.
+- ``defineCatalogHandler`` serves basic metadata (id, type, name, poster) and handles loading of both the catalog feed and searching;
 
-## Step 4: Implement catalog
-
-We have 2 types of resources serving meta:
-
-    /catalog/ serves basic metadata (id, type, name, poster) and handles loading of both the catalog feed and searching;
-
-    /meta/ serves advanced metadata for individual items, for imdb ids though (what we're using in this example add-on), we usualy do not need to handle this method at all as it is handled automatically by Stremio's Cinemeta
+- ``defineMetaHandler`` serves [advanced metadata](https://github.com/Stremio/stremio-addon-sdk/blob/docs/docs/api/responses/meta.md) for individual items, for imdb ids though (what we're using in this example add-on), we do not need to handle this method at all as it is handled automatically by Stremio's Cinemeta
 
 **For now, we have the simple goal of loading the movies we provide on the top of Discover.**
 
-Lets's tell Stremio that we will handle catalog.
+Append to addon.js:
 
-We will update our manifest to reflect that.
+```javascript
+const METAHUB_URL = "https://images.metahub.space"
 
-```python
-    'catalogs': [
-            {'type': 'movie', 'id': 'Hello, Python'},
-            {'type': 'series', 'id': 'Hello, Python'}
-    ],
-
-    'resources': [
-        'catalog',
-        {'name': 'stream', 'types': [
-            'movie', 'series'], 'idPrefixes': ['tt', 'hpy']}
-    ]
-```
-
-As you can see we define two catalogs - one for movies and one for series. In the `resources` section we state that the `catalog` resource is also supported by our add-on.
-
-Now we can append our catalog data into the `stremio-addon.py` file:
-
-```python
-CATALOG = {
-    'movie': [
-        {'id': 'tt0032138', 'name': 'The Wizard of Oz', 'genres': [
-            'Adventure', 'Family', 'Fantasy', 'Musical']},
-        {'id': 'tt0017136', 'name': 'Metropolis',
-         'genres': ['Drama', 'Sci-Fi']},
-        {'id': 'tt0051744', 'name': 'House on Haunted Hill',
-         'genres': ['Horror', 'Mystery']},
-        {'id': 'tt1254207', 'name': 'Big Buck Bunny',
-         'genres': ['Animation', 'Short', 'Comedy'], },
-        {'id': 'tt0031051', 'name': 'The Arizona Kid',
-         'genres': ['Music', 'War', 'Western']},
-        {'id': 'tt0137523', 'name': 'Fight Club', 'genres': ['Drama']}
-    ],
-    'series': [
-        {
-            'id': 'tt1748166',
-            'name': 'Pioneer One',
-            'genres': ['Drama'],
-            'videos': [
-                    {'season': 1, 'episode': 1, 'id': 'tt1748166:1:1',
-                        'title': 'Earthfall', 'released': '2010-06-16'}
-            ]
-        },
-        {
-            'id': 'hpytt0147753',
-            'name': 'Captain Z-Ro',
-            'description': 'From his secret laboratory, Captain Z-Ro and his associates use their time machine, the ZX-99, to learn from the past and plan for the future.',
-            'releaseInfo': '1955-1956',
-            'logo': 'https://fanart.tv/fanart/tv/70358/hdtvlogo/captain-z-ro-530995d5e979d.png',
-            'imdbRating': 6.9,
-            'genres': ['Sci-Fi'],
-            'videos': [
-                    {'season': 1, 'episode': 1, 'id': 'hpytt0147753:1:1',
-                        'title': 'Christopher Columbus', 'released': '1955-12-18'},
-                    {'season': 1, 'episode': 2, 'id': 'hpytt0147753:1:2',
-                        'title': 'Daniel Boone', 'released': '1955-12-25'}
-            ]
-        }
-    ]
+const generateMetaPreview = function(value, key) {
+    // To provide basic meta for our movies for the catalog
+    // we'll fetch the poster from Stremio's MetaHub
+    // see https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/api/responses/meta.md#meta-preview-object
+    const imdbId = key.split(":")[0]
+    return {
+        id: imdbId,
+        type: value.type,
+        name: value.name,
+        poster: METAHUB_URL+"/poster/medium/"+imdbId+"/img",
+    }
 }
 
-# This is template we'll be using to construct URL for the item poster
-METAHUB_URL = 'https://images.metahub.space/poster/medium/{}/img'
+builder.defineCatalogHandler(function(args, cb) {
+    // filter the dataset object and only take the requested type
+    const metas = Object.entries(dataset)
+        .filter(([_, value]) => value.type === args.type)
+        .map(([key, value]) => generateMetaPreview(value, key))
+
+    return Promise.resolve({ metas: metas })
+})
 ```
 
-Then let's handle the catalog route.
+Step 6: putting everything together
+===================
 
-```python
-@app.route('/catalog/<type>/<id>.json')
-def addon_catalog(type, id):
-    if type not in MANIFEST['types']:
-        abort(404)
+It's time to run our add-on!
 
-    catalog = CATALOG[type] if type in CATALOG else []
-    metaPreviews = {
-        'metas': [
-            {
-                'id': item['id'],
-                'type': type,
-                'name': item['name'],
-                'genres': item['genres'],
-                'poster': METAHUB_URL.format(item['id'])
-            } for item in catalog
-        ]
-    }
-    return respond_with(metaPreviews)
+Append to addon.js:
+```javascript
+module.exports = builder.getInterface()
 ```
 
-If you run and install your add-on right now you'll notice that the new catalogs appear in the Stremio's Board and also you have this catalogs in the left pane of the discover. You can also play the videos from the sources we provide.
+And now create a new file, server.js, that only contains:
 
-However, for the sake of completeness, we'll handle one more case, where Cinemeta is unable to find information about the content.
+```javascript
+const { serveHTTP } = require("stremio-addon-sdk");
 
-## Step 5: Implement meta
-
-Maybe you have noticed that in the catalog that we defined in **Step 4**, there is more data than the one we provide on catalog request. There is also an item with `id` prefixed with `hpy` instead of `tt`.
-
-Cinemeta looks up the media by IMDB ID so it can't find data for our `hpy` prefixed entry. This is the case where our add-on must provide that data.
-
-We already have all the information needed, so let's expose it.
-
-First we will again update our add-on's manifest.
-
-```python
-    'resources': [
-        'catalog',
-        # The meta call will be invoked only for series with ID starting with hpy
-        {'name': "meta", 'types': ["series"], 'idPrefixes': ["hpy"]},
-        {'name': 'stream', 'types': [
-            'movie', 'series'], 'idPrefixes': ['tt', 'hpy']}
-    ]
+const addonInterface = require("./addon");
+serveHTTP(addonInterface, { port: 7000 });
 ```
 
-The `idPrefixes` defines a list of prefixes that we can handle. Stremio will not ask our add-on for data on `ID` that doesn't start with some of the predefined prefixes. If we omit this parameter, Stremio will ask our add-on for any item it encounters.
+Run the add-on with `npm start` and add `http://127.0.0.1:7000/manifest.json` as the Repository URL in Stremio.
 
-With the updated manifest, we are ready to handle the `/meta/` request.
+This add-on also supports serverless deployment, just create a new file called serverless.js, that contains:
 
-```python
-OPTIONAL_META = ["posterShape", "background", "logo", "videos", "description", "releaseInfo", "imdbRating", "director", "cast",
-                 "dvdRelease", "released", "inTheaters", "certification", "runtime", "language", "country", "awards", "website", "isPeered"]
+```javascript
+const { getRouter } = require("stremio-addon-sdk");
+const addonInterface = require("./addon");
 
+const router = getRouter(addonInterface);
 
-@app.route('/meta/<type>/<id>.json')
-def addon_meta(type, id):
-    if type not in MANIFEST['types']:
-        abort(404)
-
-    def mk_item(item):
-        meta = dict((key, item[key])
-                    for key in item.keys() if key in OPTIONAL_META)
-        meta['id'] = item['id']
-        meta['type'] = type
-        meta['name'] = item['name']
-        meta['genres'] = item['genres']
-        meta['poster'] = METAHUB_URL.format(item['id'])
-        return meta
-
-    meta = {
-        'meta': next((mk_item(item)
-                      for item in CATALOG[type] if item['id'] == id),
-                     None)
-    }
-
-    return respond_with(meta)
+module.exports = function(req, res) {
+    router(req, res, function() {
+        res.statusCode = 404;
+        res.end();
+    });
+}
 ```
 
-That's it. We are ready with our add-on. You can now load it into Stremio and start steaming.
+You can check out [this now.json file](./now.json) that would make this add-on work with now.sh serverless deployment.
+
+Now, if you want to deploy your add-on and make it accessible publically, proceed to [our deployment guide](https://github.com/Stremio/stremio-addon-sdk/blob/master/docs/deploying/deploying.md).
+
+
+Step 7: result
+===================
+
+![addlink](https://user-images.githubusercontent.com/1777923/43146711-65a33ccc-8f6a-11e8-978e-4c69640e63e3.png)
+![discover](screenshots/stremio-addons-discover.png)
+![board](screenshots/stremio-addons-board.png)
+![streaming from add-on](screenshots/streaming.png)
