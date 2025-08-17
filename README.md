@@ -1,5 +1,5 @@
 # Hello world add-on for Stremio
-
+a
 ### Adds a few public domain movies to Stremio
 
 This example shows how to make a Stremio Add-on with Stremio's [Add-on SDK](https://github.com/Stremio/stremio-addon-sdk).
