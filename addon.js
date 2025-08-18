@@ -16,14 +16,14 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.1.0",
+    "version": "1.3.0",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
     "logo": "https://via.placeholder.com/256x256/ff6b35/ffffff?text=ErdoFlix",
     "background": "https://via.placeholder.com/1920x1080/1a1a1a/ffffff?text=ErdoFlix+Background",
 
-    "types": ["movie"],
+    "types": ["movie", "tv"],
 
     "catalogs": [
         {
@@ -52,6 +52,28 @@ const manifest = {
                     "isRequired": true
                 }
             ]
+        },
+        {
+            "type": "tv",
+            "id": "erdoflix_tv_channels",
+            "name": "ErdoFlix TV Kanalları",
+            "extra": [
+                {
+                    "name": "skip",
+                    "isRequired": false
+                }
+            ]
+        },
+        {
+            "type": "tv",
+            "id": "erdoflix_tv_search",
+            "name": "ErdoFlix TV Arama",
+            "extra": [
+                {
+                    "name": "search",
+                    "isRequired": true
+                }
+            ]
         }
     ],
 
@@ -60,7 +82,7 @@ const manifest = {
         "meta",
         {
             "name": "stream",
-            "types": ["movie"],
+            "types": ["movie", "tv"],
             "idPrefixes": ["ey"]
         }
     ],
@@ -113,7 +135,7 @@ async function fetchMovies(limit = 100, searchQuery = null, genreFilter = null) 
 
         const filterParam = encodeURIComponent(JSON.stringify(baseFilter));
         const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}&appends[]=turler&appends[]=kaynaklar_id&appends[]=film_altyazilari_id`;
-        
+
         console.log(`API'ye istek gönderiliyor (filtreli): ${url.substring(0, 150)}...`);
         if (searchQuery) console.log(`🔍 Arama terimi: "${searchQuery}"`);
         if (genreFilter) console.log(`🎭 Tür filtresi: "${genreFilter}"`);
@@ -135,6 +157,79 @@ async function fetchMovies(limit = 100, searchQuery = null, genreFilter = null) 
         } else {
             console.log(`API genel hatası: ${error.message}`);
         }
+        return [];
+    }
+}
+
+// TV Channels API Helper Function
+async function fetchTVChannels(limit = 100, searchQuery = null) {
+    try {
+        console.log(`TV kanalları getiriliyor - arama: ${searchQuery || 'yok'}, limit: ${limit}`);
+
+        // Geçici olarak mock data kullan - gerçek endpoint'i kullanıcıdan soralım
+        console.log('⚠️ TV API endpoint bulunamadı, mock data kullanılıyor');
+
+        const mockChannels = [
+            {
+                id: 1,
+                name: "TRT 1",
+                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=TRT1",
+                url1: "https://tv-trt1.medya.trt.com.tr/master.m3u8",
+                url2: "https://tv-trt1-dvr.medya.trt.com.tr/master.m3u8",
+                url3: null,
+                url4: null
+            },
+            {
+                id: 2,
+                name: "Kanal D",
+                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=KANALD",
+                url1: "https://demiroren-live.daioncdn.net/kanald/kanald.m3u8",
+                url2: null,
+                url3: null,
+                url4: null
+            },
+            {
+                id: 3,
+                name: "Show TV",
+                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=SHOW",
+                url1: "https://ciner-live.daioncdn.net/showtv/showtv.m3u8",
+                url2: null,
+                url3: null,
+                url4: null
+            },
+            {
+                id: 4,
+                name: "ATV",
+                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=ATV",
+                url1: "https://trkvz-live.daioncdn.net/atv/atv.m3u8",
+                url2: null,
+                url3: null,
+                url4: null
+            },
+            {
+                id: 5,
+                name: "Star TV",
+                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=STAR",
+                url1: "https://dogus-live.daioncdn.net/startv/startv.m3u8",
+                url2: null,
+                url3: null,
+                url4: null
+            }
+        ];
+
+        let filteredChannels = mockChannels;
+
+        if (searchQuery && searchQuery.length >= 2) {
+            filteredChannels = mockChannels.filter(channel =>
+                channel.name.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        console.log(`${filteredChannels.length} TV kanalı bulundu (mock data)`);
+        return filteredChannels.slice(0, limit);
+
+    } catch (error) {
+        console.log(`TV kanalları hatası: ${error.message}`);
         return [];
     }
 }
@@ -241,104 +336,146 @@ async function validateStreamUrl(url) {
 
 const builder = new addonBuilder(manifest);
 
-// Catalog handler - Film listesini döndürür
+// Catalog handler - Film ve TV listesini döndürür
 builder.defineCatalogHandler(async function(args) {
     console.log(`Catalog istegi: ${JSON.stringify(args)}`);
 
-    if (args.type !== 'movie' || !['erdoflix_movies', 'erdoflix_search'].includes(args.id)) {
-        return Promise.resolve({ metas: [] });
-    }
+    // Movie catalog handling
+    if (args.type === 'movie' && ['erdoflix_movies', 'erdoflix_search'].includes(args.id)) {
+        try {
+            // Skip parametresi için sayfalama
+            const skip = parseInt(args.extra?.skip) || 0;
+            const pageSize = 50;
 
-    try {
-        // Skip parametresi için sayfalama
-        const skip = parseInt(args.extra?.skip) || 0;
-        const pageSize = 50;
-
-        // Search parametresi temizle
-        let searchQuery = args.extra?.search;
-        if (searchQuery) {
-            searchQuery = searchQuery.split('.json')[0].split('?')[0].trim();
-        }
-
-        // Search catalog için özel kontrol
-        if (args.id === 'erdoflix_search') {
-            if (!searchQuery || searchQuery.length < 2) {
-                console.log(`Search catalog için geçersiz query: "${searchQuery}"`);
-                return Promise.resolve({ metas: [] });
+            // Search parametresi temizle
+            let searchQuery = args.extra?.search;
+            if (searchQuery) {
+                searchQuery = searchQuery.split('.json')[0].split('?')[0].trim();
             }
+
+            // Search catalog için özel kontrol
+            if (args.id === 'erdoflix_search') {
+                if (!searchQuery || searchQuery.length < 2) {
+                    console.log(`Search catalog için geçersiz query: "${searchQuery}"`);
+                    return Promise.resolve({ metas: [] });
+                }
+            }
+
+            // Genre filtresi temizle
+            let selectedGenre = args.extra?.genre;
+            if (selectedGenre) {
+                selectedGenre = selectedGenre.split('.json')[0].split('?')[0];
+            }
+
+            console.log(`🎬 Film Catalog parametreleri: catalog=${args.id}, skip=${skip}, search="${searchQuery || 'Yok'}", genre="${selectedGenre || 'Yok'}"`);
+
+            // API'den doğrudan filtreli sonuçları al
+            const totalLimit = skip + pageSize + 50;
+            const movies = await fetchMovies(totalLimit, searchQuery, selectedGenre);
+
+            console.log(`📊 API'den ${movies.length} filtreli film alındı`);
+
+            // Sadece sayfalama uygula
+            const paginatedMovies = movies.slice(skip, skip + pageSize);
+
+            const metas = paginatedMovies.map(movie => {
+                // Film türlerini çıkar
+                const genres = movie.turler?.map(tur => tur.baslik) || ['Film'];
+
+                return {
+                    id: `ey${movie.id}`,
+                    type: 'movie',
+                    name: movie.baslik || movie.orjinal_baslik || 'Bilinmeyen Film',
+                    poster: movie.kapak_foto || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+                    year: movie.yayin_yili,
+                    genres: genres,
+                    imdbRating: movie.imdb_puani || null
+                };
+            });
+
+            console.log(`📄 Sayfa döndürülüyor: ${metas.length} film (skip: ${skip})`);
+            return Promise.resolve({ metas });
+
+        } catch (error) {
+            console.log(`Film catalog hatası: ${error.message}`);
+            return Promise.resolve({ metas: [] });
         }
-
-        // Genre filtresi temizle
-        let selectedGenre = args.extra?.genre;
-        if (selectedGenre) {
-            selectedGenre = selectedGenre.split('.json')[0].split('?')[0];
-        }
-
-        console.log(`🎬 Catalog parametreleri: catalog=${args.id}, skip=${skip}, search="${searchQuery || 'Yok'}", genre="${selectedGenre || 'Yok'}"`);
-
-        // API'den doğrudan filtreli sonuçları al
-        const totalLimit = skip + pageSize + 50; // Sayfalama için biraz fazla al
-        const movies = await fetchMovies(totalLimit, searchQuery, selectedGenre);
-        
-        console.log(`📊 API'den ${movies.length} filtreli film alındı`);
-
-        // Sadece sayfalama uygula (filtreleme API'de yapıldı)
-        const paginatedMovies = movies.slice(skip, skip + pageSize);
-
-        const metas = paginatedMovies.map(movie => {
-            // Film türlerini çıkar
-            const genres = movie.turler?.map(tur => tur.baslik) || ['Film'];
-
-            return {
-                id: `ey${movie.id}`,
-                type: 'movie',
-                name: movie.baslik || movie.orjinal_baslik || `Film ${movie.id}`,
-                poster: movie.poster || `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(movie.baslik || 'Film')}`,
-                background: movie.arka_plan || undefined,
-                description: movie.detay || undefined,
-                releaseInfo: movie.yayin_tarihi || undefined,
-                year: movie.yayin_tarihi ? new Date(movie.yayin_tarihi).getFullYear() : undefined,
-                country: 'TR',
-                language: 'tr',
-                // Gerçek film türleri
-                genre: genres,
-                runtime: undefined,
-                imdbRating: undefined,
-                // Popüler catalog için öncelik
-                ...(args.id === 'erdoflix_top' && { featured: true })
-            };
-        });
-
-        console.log(`✅ Catalog '${args.id}' tamamlandı: ${metas.length} film döndürüldü (skip: ${skip})`);
-        return Promise.resolve({
-            metas: metas,
-            cacheMaxAge: args.id === 'erdoflix_search' ? 900 : 1800 // Search için daha kısa cache
-        });
-    } catch (error) {
-        console.log(`Catalog hatası: ${error.message}`);
-        return Promise.resolve({ metas: [] });
     }
+
+    // TV catalog handling
+    else if (args.type === 'tv' && ['erdoflix_tv_channels', 'erdoflix_tv_search'].includes(args.id)) {
+        try {
+            // Skip parametresi için sayfalama
+            const skip = parseInt(args.extra?.skip) || 0;
+            const pageSize = 50;
+
+            // Search parametresi temizle
+            let searchQuery = args.extra?.search;
+            if (searchQuery) {
+                searchQuery = searchQuery.split('.json')[0].split('?')[0].trim();
+            }
+
+            // Search catalog için özel kontrol
+            if (args.id === 'erdoflix_tv_search') {
+                if (!searchQuery || searchQuery.length < 2) {
+                    console.log(`TV Search catalog için geçersiz query: "${searchQuery}"`);
+                    return Promise.resolve({ metas: [] });
+                }
+            }
+
+            console.log(`📺 TV Catalog parametreleri: catalog=${args.id}, skip=${skip}, search="${searchQuery || 'Yok'}"`);
+
+            // TV kanalları API'sinden veri al
+            const totalLimit = skip + pageSize + 50;
+            const channels = await fetchTVChannels(totalLimit, searchQuery);
+
+            console.log(`📊 API'den ${channels.length} TV kanalı alındı`);
+
+            // Sadece sayfalama uygula
+            const paginatedChannels = channels.slice(skip, skip + pageSize);
+
+            const metas = paginatedChannels.map((channel, index) => {
+                return {
+                    id: `ey_tv_${channel.id || index}`,
+                    type: 'tv',
+                    name: channel.name || 'Bilinmeyen Kanal',
+                    poster: channel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                    genres: ['TV', 'Live'],
+                    description: `Canlı TV Kanalı: ${channel.name || 'Bilinmeyen'}`,
+                    // TV için gerekli olan alanlar
+                    year: new Date().getFullYear()
+                };
+            });
+
+            console.log(`📄 TV Sayfa döndürülüyor: ${metas.length} kanal (skip: ${skip})`);
+            return Promise.resolve({ metas });
+
+        } catch (error) {
+            console.log(`TV catalog hatası: ${error.message}`);
+            return Promise.resolve({ metas: [] });
+        }
+    }
+
+    // Desteklenmeyen catalog
+    return Promise.resolve({ metas: [] });
 });
 
-// Meta handler - Film detaylarını döndürür (İzleme geçmişi için kritik)
+// Meta handler - Film ve TV detaylarını döndürür (İzleme geçmişi için kritik)
 builder.defineMetaHandler(async function(args) {
     console.log(`Meta handler çağrıldı: ${JSON.stringify(args)}`);
 
-    if (args.type !== 'movie') {
-        console.log(`Desteklenmeyen tip: ${args.type}`);
-        return Promise.resolve({ meta: {} });
-    }
+    // Movie meta handling
+    if (args.type === 'movie') {
+        // ID'den film ID'sini çıkar (ey prefix'ini kaldır)
+        if (!args.id.startsWith('ey')) {
+            console.log(`Geçersiz film ID formatı: ${args.id}`);
+            return Promise.resolve({ meta: {} });
+        }
 
-    // ID'den film ID'sini çıkar (ey prefix'ini kaldır)
-    if (!args.id.startsWith('ey')) {
-        console.log(`Geçersiz ID formatı: ${args.id}`);
-        return Promise.resolve({ meta: {} });
-    }
+        const movieId = args.id.substring(2); // 'ey' prefix'ini kaldır
+        console.log(`Film ${movieId} için meta bilgisi aranıyor`);
 
-    const movieId = args.id.substring(2); // 'ey' prefix'ini kaldır
-    console.log(`Film ${movieId} için meta bilgisi aranıyor`);
-
-    try {
+        try {
         // API'den filmleri al
         const movies = await fetchMovies(300, null, null); // Meta için filtreleme yok
         const targetMovie = movies.find(movie => movie.id.toString() === movieId);
@@ -385,38 +522,98 @@ builder.defineMetaHandler(async function(args) {
             meta: meta,
             cacheMaxAge: 3600 // 1 saat cache
         });
-    } catch (error) {
-        console.log(`❌ Meta hatası Film ${movieId}: ${error.message}`);
-        // Hata durumunda bile basit meta döndür
-        return Promise.resolve({
-            meta: {
-                id: args.id,
-                type: 'movie',
-                name: `Film ${movieId}`,
-                poster: `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=Film+${movieId}`
-            }
-        });
+
+        } catch (error) {
+            console.log(`❌ Meta hatası Film ${movieId}: ${error.message}`);
+            // Hata durumunda bile basit meta döndür
+            return Promise.resolve({
+                meta: {
+                    id: args.id,
+                    type: 'movie',
+                    name: `Film ${movieId}`,
+                    poster: `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=Film+${movieId}`
+                }
+            });
+        }
     }
+
+    // TV meta handling
+    else if (args.type === 'tv') {
+        // ID'den TV kanal ID'sini çıkar (ey_tv_ prefix'ini kaldır)
+        if (!args.id.startsWith('ey_tv_')) {
+            console.log(`Geçersiz TV ID formatı: ${args.id}`);
+            return Promise.resolve({ meta: {} });
+        }
+
+        const channelId = args.id.substring(6); // 'ey_tv_' prefix'ini kaldır
+        console.log(`TV kanalı ${channelId} için meta bilgisi aranıyor`);
+
+        try {
+            // TV kanalları listesinden al
+            const channels = await fetchTVChannels(1000, null);
+            const targetChannel = channels.find(channel =>
+                channel.id?.toString() === channelId || channels.indexOf(channel).toString() === channelId
+            );
+
+            if (!targetChannel) {
+                console.log(`TV kanalı ${channelId} bulunamadı`);
+                return Promise.resolve({ meta: {} });
+            }
+
+            const meta = {
+                id: args.id,
+                type: 'tv',
+                name: targetChannel.name || 'Bilinmeyen Kanal',
+                poster: targetChannel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                background: targetChannel.logo || undefined,
+                description: `Canlı TV Kanalı: ${targetChannel.name || 'Bilinmeyen'}`,
+                genres: ['TV', 'Live'],
+                year: new Date().getFullYear(),
+                country: 'TR',
+                language: 'tr',
+                runtime: 'Live Stream'
+            };
+
+            console.log(`✅ TV kanalı ${channelId} meta başarılı: "${meta.name}"`);
+            return Promise.resolve({
+                meta: meta,
+                cacheMaxAge: 3600
+            });
+
+        } catch (error) {
+            console.log(`❌ TV Meta hatası kanal ${channelId}: ${error.message}`);
+            return Promise.resolve({
+                meta: {
+                    id: args.id,
+                    type: 'tv',
+                    name: `TV Kanalı ${channelId}`,
+                    poster: 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV'
+                }
+            });
+        }
+    }
+
+    // Desteklenmeyen tip
+    console.log(`Desteklenmeyen tip: ${args.type}`);
+    return Promise.resolve({ meta: {} });
 });
 
-// Stream handler - Video kaynaklarını döndürür
+// Stream handler - Video kaynaklarını döndürür (Film ve TV)
 builder.defineStreamHandler(async function(args) {
-    if (args.type !== 'movie') {
-        return Promise.resolve({ streams: [] });
-    }
+    // Movie stream handling
+    if (args.type === 'movie') {
+        // ID'den film ID'sini çıkar (ey prefix'ini kaldır)
+        if (!args.id.startsWith('ey')) {
+            return Promise.resolve({ streams: [] });
+        }
 
-    // ID'den film ID'sini çıkar (ey prefix'ini kaldır)
-    if (!args.id.startsWith('ey')) {
-        return Promise.resolve({ streams: [] });
-    }
+        const movieId = args.id.substring(2); // 'ey' prefix'ini kaldır
+        console.log(`🎬 Film ${movieId} için gelişmiş stream aranıyor`);
 
-    const movieId = args.id.substring(2); // 'ey' prefix'ini kaldır
-    console.log(`🎬 Film ${movieId} için gelişmiş stream aranıyor`);
-
-    try {
-        // Filmler listesinden embedded verilerle birlikte al
-        const movies = await fetchMovies(300, null, null); // Stream için filtreleme yok
-        const targetMovie = movies.find(movie => movie.id.toString() === movieId);
+        try {
+            // Filmler listesinden embedded verilerle birlikte al
+            const movies = await fetchMovies(300, null, null); // Stream için filtreleme yok
+            const targetMovie = movies.find(movie => movie.id.toString() === movieId);
 
         if (!targetMovie) {
             console.log(`❌ Film ${movieId} bulunamadı`);
@@ -535,10 +732,121 @@ builder.defineStreamHandler(async function(args) {
             streams: streams,
             cacheMaxAge: 1800 // 30 dakika cache
         });
-    } catch (error) {
-        console.log(`❌ Stream hatası Film ${movieId}: ${error.message}`);
-        return Promise.resolve({ streams: [] });
+        } catch (error) {
+            console.log(`❌ Stream hatası Film ${movieId}: ${error.message}`);
+            return Promise.resolve({ streams: [] });
+        }
     }
+
+    // TV stream handling
+    else if (args.type === 'tv') {
+        // ID'den TV kanal ID'sini çıkar (ey_tv_ prefix'ini kaldır)
+        if (!args.id.startsWith('ey_tv_')) {
+            return Promise.resolve({ streams: [] });
+        }
+
+        const channelId = args.id.substring(6); // 'ey_tv_' prefix'ini kaldır
+        console.log(`📺 TV kanalı ${channelId} için stream aranıyor`);
+
+        try {
+            // TV kanalları listesinden al
+            const channels = await fetchTVChannels(1000, null);
+            const targetChannel = channels.find(channel =>
+                channel.id?.toString() === channelId || channels.indexOf(channel).toString() === channelId
+            );
+
+            if (!targetChannel) {
+                console.log(`TV kanalı ${channelId} bulunamadı`);
+                return Promise.resolve({ streams: [] });
+            }
+
+            console.log(`TV kanalı bulundu: ${targetChannel.name}`);
+            const streams = [];
+
+            // Her URL'yi stream olarak ekle
+            if (targetChannel.url1) {
+                streams.push({
+                    name: `${targetChannel.name} - Kaynak 1`,
+                    title: `${targetChannel.name} (HD)`,
+                    url: targetChannel.url1,
+                    ytId: null,
+                    infoHash: null,
+                    fileIdx: null,
+                    quality: "HD",
+                    tag: ["Live TV"],
+                    behavioral_hints: {
+                        notWebReady: false,
+                        bingeGroup: `tv_${channelId}`
+                    }
+                });
+            }
+
+            if (targetChannel.url2) {
+                streams.push({
+                    name: `${targetChannel.name} - Kaynak 2`,
+                    title: `${targetChannel.name} (Alternatif)`,
+                    url: targetChannel.url2,
+                    ytId: null,
+                    infoHash: null,
+                    fileIdx: null,
+                    quality: "HD",
+                    tag: ["Live TV", "Alternative"],
+                    behavioral_hints: {
+                        notWebReady: false,
+                        bingeGroup: `tv_${channelId}`
+                    }
+                });
+            }
+
+            if (targetChannel.url3) {
+                streams.push({
+                    name: `${targetChannel.name} - Kaynak 3`,
+                    title: `${targetChannel.name} (Yedek)`,
+                    url: targetChannel.url3,
+                    ytId: null,
+                    infoHash: null,
+                    fileIdx: null,
+                    quality: "SD",
+                    tag: ["Live TV", "Backup"],
+                    behavioral_hints: {
+                        notWebReady: false,
+                        bingeGroup: `tv_${channelId}`
+                    }
+                });
+            }
+
+            if (targetChannel.url4) {
+                streams.push({
+                    name: `${targetChannel.name} - Kaynak 4`,
+                    title: `${targetChannel.name} (Mobil)`,
+                    url: targetChannel.url4,
+                    ytId: null,
+                    infoHash: null,
+                    fileIdx: null,
+                    quality: "SD",
+                    tag: ["Live TV", "Mobile"],
+                    behavioral_hints: {
+                        notWebReady: false,
+                        bingeGroup: `tv_${channelId}`
+                    }
+                });
+            }
+
+            console.log(`📺 TV kanalı ${channelId} için ${streams.length} stream döndürülüyor`);
+
+            return Promise.resolve({
+                streams: streams,
+                cacheMaxAge: 300 // 5 dakika cache (TV için daha kısa)
+            });
+
+        } catch (error) {
+            console.log(`❌ TV Stream hatası kanal ${channelId}: ${error.message}`);
+            return Promise.resolve({ streams: [] });
+        }
+    }
+
+    // Desteklenmeyen tip
+    return Promise.resolve({ streams: [] });
 });
 
 module.exports = builder.getInterface();
