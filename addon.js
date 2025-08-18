@@ -16,7 +16,7 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.0.6",
+    "version": "1.0.8",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -32,25 +32,10 @@ const manifest = {
             "name": "ErdoFlix Filmler",
             "extra": [
                 {
-                    "name": "search",
-                    "isRequired": false
-                },
-                {
                     "name": "genre",
                     "options": ["aksiyon", "komedi", "dram", "korku", "bilim-kurgu", "gerilim", "romantik", "tarih", "aile", "suç"],
                     "isRequired": false
                 },
-                {
-                    "name": "skip",
-                    "isRequired": false
-                }
-            ]
-        },
-        {
-            "type": "movie",
-            "id": "erdoflix_top",
-            "name": "ErdoFlix Popüler",
-            "extra": [
                 {
                     "name": "skip",
                     "isRequired": false
@@ -128,20 +113,120 @@ async function fetchMovies(limit = 1000) {
     }
 }
 
+// M3U8 playlist'ini parse ederek embedded subtitles ve audio tracks bulur
+async function parseM3U8(url) {
+    try {
+        console.log(`M3U8 parse ediliyor: ${url}`);
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            },
+            timeout: 5000
+        });
+
+        const content = response.data;
+        const lines = content.split('\n');
+        const subtitles = [];
+        const audioTracks = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Subtitle tracks
+            if (line.startsWith('#EXT-X-MEDIA:TYPE=SUBTITLES')) {
+                const subtitle = {};
+                
+                // Language
+                const langMatch = line.match(/LANGUAGE="([^"]+)"/);
+                if (langMatch) subtitle.lang = langMatch[1];
+                
+                // Name/Label
+                const nameMatch = line.match(/NAME="([^"]+)"/);
+                if (nameMatch) subtitle.label = nameMatch[1];
+                
+                // URI
+                const uriMatch = line.match(/URI="([^"]+)"/);
+                if (uriMatch) {
+                    subtitle.url = uriMatch[1];
+                    // Relative URL'yi absolute yap
+                    if (!subtitle.url.startsWith('http')) {
+                        const baseUrl = url.substring(0, url.lastIndexOf('/') + 1);
+                        subtitle.url = baseUrl + subtitle.url;
+                    }
+                }
+                
+                // Default
+                const isDefault = line.includes('DEFAULT=YES');
+                if (isDefault) subtitle.default = true;
+
+                if (subtitle.url) {
+                    subtitle.format = subtitle.url.includes('.vtt') ? 'vtt' : 'srt';
+                    subtitles.push(subtitle);
+                }
+            }
+            
+            // Audio tracks
+            if (line.startsWith('#EXT-X-MEDIA:TYPE=AUDIO')) {
+                const audio = {};
+                
+                const langMatch = line.match(/LANGUAGE="([^"]+)"/);
+                if (langMatch) audio.lang = langMatch[1];
+                
+                const nameMatch = line.match(/NAME="([^"]+)"/);
+                if (nameMatch) audio.name = nameMatch[1];
+                
+                const isDefault = line.includes('DEFAULT=YES');
+                if (isDefault) audio.default = true;
+                
+                audioTracks.push(audio);
+            }
+        }
+
+        console.log(`M3U8 parse sonucu: ${subtitles.length} altyazı, ${audioTracks.length} ses track`);
+        return { subtitles, audioTracks };
+    } catch (error) {
+        console.log(`M3U8 parse hatası: ${error.message}`);
+        return { subtitles: [], audioTracks: [] };
+    }
+}
+
+// Stream URL'nin geçerli olup olmadığını kontrol eder
+async function validateStreamUrl(url) {
+    try {
+        console.log(`Stream URL kontrol ediliyor: ${url}`);
+        const response = await axios.head(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            },
+            timeout: 3000,
+            validateStatus: function (status) {
+                return status < 500; // 4xx'ler de geçerli sayılsın
+            }
+        });
+        
+        const isValid = response.status >= 200 && response.status < 400;
+        console.log(`Stream URL ${url} - Status: ${response.status}, Geçerli: ${isValid}`);
+        return isValid;
+    } catch (error) {
+        console.log(`Stream URL kontrol hatası ${url}: ${error.message}`);
+        return false;
+    }
+}
+
 const builder = new addonBuilder(manifest);
 
 // Catalog handler - Film listesini döndürür
 builder.defineCatalogHandler(async function(args) {
     console.log(`Catalog istegi: ${JSON.stringify(args)}`);
 
-    if (args.type !== 'movie' || !['erdoflix_movies', 'erdoflix_top', 'erdoflix_search'].includes(args.id)) {
+    if (args.type !== 'movie' || !['erdoflix_movies', 'erdoflix_search'].includes(args.id)) {
         return Promise.resolve({ metas: [] });
     }
 
     try {
         // Skip parametresi için sayfalama
         const skip = parseInt(args.extra?.skip) || 0;
-        const pageSize = args.id === 'erdoflix_top' ? 20 : 50; // Popüler için daha az
+        const pageSize = 50;
 
         // Search parametresi
         let searchQuery = args.extra?.search;
@@ -204,13 +289,10 @@ builder.defineCatalogHandler(async function(args) {
                 );
             });
             console.log(`Genre "${selectedGenre}" filtresi uygulandı: ${filteredMovies.length} film kaldı`);
-        }        // Popüler catalog için tersten sırala (en yeni önce)
-        let processedMovies = args.id === 'erdoflix_top'
-            ? filteredMovies.slice().reverse()
-            : filteredMovies;
+        }
 
         // Sayfalama uygula
-        const paginatedMovies = processedMovies.slice(skip, skip + pageSize);
+        const paginatedMovies = filteredMovies.slice(skip, skip + pageSize);
 
         const metas = paginatedMovies.map(movie => {
             // Film türlerini çıkar
@@ -338,7 +420,7 @@ builder.defineStreamHandler(async function(args) {
     }
 
     const movieId = args.id.substring(2); // 'ey' prefix'ini kaldır
-    console.log(`Film ${movieId} için stream aranıyor`);
+    console.log(`🎬 Film ${movieId} için gelişmiş stream aranıyor`);
 
     try {
         // Filmler listesinden embedded verilerle birlikte al
@@ -346,7 +428,7 @@ builder.defineStreamHandler(async function(args) {
         const targetMovie = movies.find(movie => movie.id.toString() === movieId);
 
         if (!targetMovie) {
-            console.log(`Film ${movieId} bulunamadı`);
+            console.log(`❌ Film ${movieId} bulunamadı`);
             return Promise.resolve({ streams: [] });
         }
 
@@ -354,19 +436,57 @@ builder.defineStreamHandler(async function(args) {
         const sources = targetMovie.kaynaklar_id || [];
         const subtitles = targetMovie.film_altyazilari_id || [];
 
-        console.log(`Film ${movieId}: ${sources.length} kaynak, ${subtitles.length} altyazı bulundu`);
+        console.log(`📊 Film ${movieId}: ${sources.length} kaynak, ${subtitles.length} altyazı bulundu`);
 
         // Her kaynak için stream oluştur
         for (const source of sources) {
             if (!source.url) continue;
 
+            console.log(`🔍 Kaynak işleniyor: "${source.baslik}" - ${source.url}`);
+            
+            // Stream URL'sini doğrula
+            const isValidUrl = await validateStreamUrl(source.url);
+            if (!isValidUrl) {
+                console.log(`❌ Geçersiz stream URL atlandı: ${source.url}`);
+                continue;
+            }
+
             const stream = {
                 url: source.url,
                 title: source.baslik || `ErdoFlix - ${source.id}`,
-                subtitles: []
+                subtitles: [],
+                behaviorHints: {
+                    bingeGroup: `erdoflix-${movieId}`,
+                    countryWhitelist: ['TR', 'US', 'GB']
+                }
             };
 
-            // Altyazıları ekle
+            // M3U8 ise embedded content'i parse et
+            if (source.url.toLowerCase().includes('.m3u8')) {
+                console.log(`🔍 M3U8 dosyası parse ediliyor: ${source.url}`);
+                const m3u8Data = await parseM3U8(source.url);
+                
+                // Embedded altyazıları ekle
+                if (m3u8Data.subtitles.length > 0) {
+                    console.log(`📝 M3U8'den ${m3u8Data.subtitles.length} embedded altyazı bulundu`);
+                    for (const sub of m3u8Data.subtitles) {
+                        stream.subtitles.push({
+                            url: sub.url,
+                            lang: sub.lang || 'tr',
+                            label: sub.label || `${sub.lang || 'Türkçe'} (Embedded)`,
+                            format: sub.format || 'vtt'
+                        });
+                    }
+                }
+
+                // Audio track bilgilerini title'a ekle
+                if (m3u8Data.audioTracks.length > 1) {
+                    const audioInfo = m3u8Data.audioTracks.map(a => a.name || a.lang).join(', ');
+                    stream.title += ` [${audioInfo}]`;
+                }
+            }
+
+            // Harici altyazıları da ekle
             for (const subtitle of subtitles) {
                 if (subtitle.url) {
                     const sub = {
@@ -384,21 +504,48 @@ builder.defineStreamHandler(async function(args) {
                     if (subtitle.baslik) {
                         sub.label = subtitle.baslik;
                     } else {
-                        sub.label = 'Türkçe';
+                        sub.label = 'Türkçe (Harici)';
                     }
 
-                    stream.subtitles.push(sub);
+                    // Aynı altyazı zaten varsa ekleme
+                    const existingSubtitle = stream.subtitles.find(s => s.url === sub.url);
+                    if (!existingSubtitle) {
+                        stream.subtitles.push(sub);
+                    }
                 }
             }
 
-            console.log(`Kaynak "${stream.title}" için ${stream.subtitles.length} altyazı eklendi`);
+            // Quality bilgilerini ekle
+            if (source.baslik) {
+                const quality = source.baslik.match(/(\d+p)/i);
+                if (quality) {
+                    stream.quality = quality[1];
+                }
+            }
+
+            console.log(`✅ Kaynak "${stream.title}" için ${stream.subtitles.length} altyazı eklendi`);
             streams.push(stream);
         }
 
-        console.log(`Film ${movieId} için ${streams.length} stream döndürülüyor`);
-        return Promise.resolve({ streams: streams });
+        // Streams'i kaliteye göre sırala (en yüksek kalite önce)
+        streams.sort((a, b) => {
+            const qualityA = parseInt(a.quality?.replace('p', '') || '0');
+            const qualityB = parseInt(b.quality?.replace('p', '') || '0');
+            return qualityB - qualityA;
+        });
+
+        console.log(`🎯 Film ${movieId} için ${streams.length} geçerli stream döndürülüyor`);
+        
+        if (streams.length === 0) {
+            console.log(`⚠️ Film ${movieId} için hiç geçerli stream bulunamadı`);
+        }
+
+        return Promise.resolve({ 
+            streams: streams,
+            cacheMaxAge: 1800 // 30 dakika cache
+        });
     } catch (error) {
-        console.log(`Stream hatası: ${error.message}`);
+        console.log(`❌ Stream hatası Film ${movieId}: ${error.message}`);
         return Promise.resolve({ streams: [] });
     }
 });
