@@ -16,7 +16,7 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.0.2",
+    "version": "1.0.3",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -28,7 +28,7 @@ const manifest = {
     "catalogs": [
         {
             "type": "movie",
-            "id": "erdoflix_movies", 
+            "id": "erdoflix_movies",
             "name": "ErdoFlix Filmler",
             "extra": [
                 {
@@ -48,7 +48,7 @@ const manifest = {
             "name": "ErdoFlix Popüler",
             "extra": [
                 {
-                    "name": "skip", 
+                    "name": "skip",
                     "isRequired": false
                 }
             ]
@@ -57,7 +57,7 @@ const manifest = {
 
     "resources": [
         "catalog",
-        "meta", 
+        "meta",
         {
             "name": "stream",
             "types": ["movie"],
@@ -77,7 +77,7 @@ const manifest = {
 async function fetchMovies(limit = 1000) {
     try {
         const filterParam = encodeURIComponent('{}');
-        const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}`;
+        const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}&appends[]=turler&appends[]=kaynaklar_id&appends[]=film_altyazilari_id`;
         console.log(`API'ye istek gönderiliyor: ${url}`);
 
         const response = await axios.get(url, {
@@ -101,57 +101,6 @@ async function fetchMovies(limit = 1000) {
     }
 }
 
-async function fetchMovieSources(movieId) {
-    try {
-        const filterParam = encodeURIComponent(`{"kaynak_id":${movieId}}`);
-        const timestamp = Date.now();
-        const url = `${API_BASE_URL}/film_kaynaklari:list?filter=${filterParam}&_t=${timestamp}`;
-        console.log(`Film kaynakları alınıyor: ${url}`);
-
-        const response = await axios.get(url, {
-            headers: {
-                ...API_HEADERS,
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            },
-            timeout: 5000
-        });
-
-        console.log(`Kaynak yanıtı: ${response.status}`);
-        console.log(`Film ${movieId} için ${response.data.data?.length || 0} kaynak bulundu`);
-        return response.data.data || [];
-    } catch (error) {
-        console.log(`Film kaynakları alınırken hata: ${error.message}`);
-        return [];
-    }
-}
-
-async function fetchMovieSubtitles(movieId) {
-    try {
-        const filterParam = encodeURIComponent(`{"film_id":${movieId}}`);
-        // Cache busting için timestamp ekle
-        const timestamp = Date.now();
-        const url = `${API_BASE_URL}/film_altyazilari:list?filter=${filterParam}&_t=${timestamp}`;
-        console.log(`Film altyazıları alınıyor: ${url}`);
-
-        const response = await axios.get(url, {
-            headers: {
-                ...API_HEADERS,
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
-            },
-            timeout: 5000
-        });
-
-        console.log(`Altyazı yanıtı: ${response.status}`);
-        console.log(`Film ${movieId} için ${response.data.data?.length || 0} altyazı bulundu`);
-        return response.data.data || [];
-    } catch (error) {
-        console.log(`Film altyazıları alınırken hata: ${error.message}`);
-        return [];
-    }
-}
-
 const builder = new addonBuilder(manifest);
 
 // Catalog handler - Film listesini döndürür
@@ -166,39 +115,44 @@ builder.defineCatalogHandler(async function(args) {
         // Skip parametresi için sayfalama
         const skip = parseInt(args.extra?.skip) || 0;
         const pageSize = args.id === 'erdoflix_top' ? 20 : 50; // Popüler için daha az
-        
+
         const movies = await fetchMovies(300);
         console.log(`${movies.length} film alındı, catalog: ${args.id}, skip: ${skip}`);
 
         // Popüler catalog için tersten sırala (en yeni önce)
-        let processedMovies = args.id === 'erdoflix_top' 
-            ? movies.slice().reverse() 
+        let processedMovies = args.id === 'erdoflix_top'
+            ? movies.slice().reverse()
             : movies;
 
         // Sayfalama uygula
         const paginatedMovies = processedMovies.slice(skip, skip + pageSize);
-        
-        const metas = paginatedMovies.map(movie => ({
-            id: `ey${movie.id}`,
-            type: 'movie',
-            name: movie.baslik || movie.orjinal_baslik || `Film ${movie.id}`,
-            poster: movie.poster || `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(movie.baslik || 'Film')}`,
-            background: movie.arka_plan || undefined,
-            description: movie.detay || undefined,
-            releaseInfo: movie.yayin_tarihi || undefined,
-            year: movie.yayin_tarihi ? new Date(movie.yayin_tarihi).getFullYear() : undefined,
-            country: 'TR',
-            language: 'tr',
-            // Ana sayfa için ek meta bilgiler
-            genre: ['film'],
-            runtime: undefined,
-            imdbRating: undefined,
-            // Popüler catalog için öncelik
-            ...(args.id === 'erdoflix_top' && { featured: true })
-        }));
+
+        const metas = paginatedMovies.map(movie => {
+            // Film türlerini çıkar
+            const genres = movie.turler?.map(tur => tur.baslik) || ['Film'];
+
+            return {
+                id: `ey${movie.id}`,
+                type: 'movie',
+                name: movie.baslik || movie.orjinal_baslik || `Film ${movie.id}`,
+                poster: movie.poster || `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(movie.baslik || 'Film')}`,
+                background: movie.arka_plan || undefined,
+                description: movie.detay || undefined,
+                releaseInfo: movie.yayin_tarihi || undefined,
+                year: movie.yayin_tarihi ? new Date(movie.yayin_tarihi).getFullYear() : undefined,
+                country: 'TR',
+                language: 'tr',
+                // Gerçek film türleri
+                genre: genres,
+                runtime: undefined,
+                imdbRating: undefined,
+                // Popüler catalog için öncelik
+                ...(args.id === 'erdoflix_top' && { featured: true })
+            };
+        });
 
         console.log(`Catalog '${args.id}'da ${metas.length} film döndürülüyor (skip: ${skip})`);
-        return Promise.resolve({ 
+        return Promise.resolve({
             metas: metas,
             cacheMaxAge: args.id === 'erdoflix_top' ? 3600 : 1800 // Popüler için daha uzun cache
         });
@@ -211,7 +165,7 @@ builder.defineCatalogHandler(async function(args) {
 // Meta handler - Film detaylarını döndürür (İzleme geçmişi için kritik)
 builder.defineMetaHandler(async function(args) {
     console.log(`Meta handler çağrıldı: ${JSON.stringify(args)}`);
-    
+
     if (args.type !== 'movie') {
         console.log(`Desteklenmeyen tip: ${args.type}`);
         return Promise.resolve({ meta: {} });
@@ -239,7 +193,10 @@ builder.defineMetaHandler(async function(args) {
         // İzleme geçmişi için gerekli tüm alanları doldur
         const movieName = targetMovie.baslik || targetMovie.orjinal_baslik || `Film ${movieId}`;
         const moviePoster = targetMovie.poster || `https://via.placeholder.com/300x450/1a1a1a/ffffff?text=${encodeURIComponent(movieName)}`;
-        
+
+        // Film türlerini çıkar
+        const genres = targetMovie.turler?.map(tur => tur.baslik) || ['Film'];
+
         const meta = {
             id: args.id, // Tam ID (ey prefix'li)
             type: 'movie',
@@ -250,7 +207,7 @@ builder.defineMetaHandler(async function(args) {
             releaseInfo: targetMovie.yayin_tarihi || undefined,
             year: targetMovie.yayin_tarihi ? new Date(targetMovie.yayin_tarihi).getFullYear() : new Date().getFullYear(),
             imdbRating: undefined,
-            genres: ['Film'],
+            genres: genres, // Gerçek film türleri
             runtime: undefined,
             director: undefined,
             cast: undefined,
@@ -265,15 +222,15 @@ builder.defineMetaHandler(async function(args) {
 
         console.log(`✅ Film ${movieId} meta başarılı: "${meta.name}" | Poster: ${meta.poster ? 'Var' : 'Yok'}`);
         console.log(`Meta detayları: ID=${meta.id}, Name="${meta.name}", Type=${meta.type}`);
-        
-        return Promise.resolve({ 
+
+        return Promise.resolve({
             meta: meta,
             cacheMaxAge: 3600 // 1 saat cache
         });
     } catch (error) {
         console.log(`❌ Meta hatası Film ${movieId}: ${error.message}`);
         // Hata durumunda bile basit meta döndür
-        return Promise.resolve({ 
+        return Promise.resolve({
             meta: {
                 id: args.id,
                 type: 'movie',
@@ -299,12 +256,20 @@ builder.defineStreamHandler(async function(args) {
     console.log(`Film ${movieId} için stream aranıyor`);
 
     try {
-        const [sources, subtitles] = await Promise.all([
-            fetchMovieSources(movieId),
-            fetchMovieSubtitles(movieId)
-        ]);
+        // Filmler listesinden embedded verilerle birlikte al
+        const movies = await fetchMovies(300);
+        const targetMovie = movies.find(movie => movie.id.toString() === movieId);
+
+        if (!targetMovie) {
+            console.log(`Film ${movieId} bulunamadı`);
+            return Promise.resolve({ streams: [] });
+        }
 
         const streams = [];
+        const sources = targetMovie.kaynaklar_id || [];
+        const subtitles = targetMovie.film_altyazilari_id || [];
+
+        console.log(`Film ${movieId}: ${sources.length} kaynak, ${subtitles.length} altyazı bulundu`);
 
         // Her kaynak için stream oluştur
         for (const source of sources) {
@@ -321,7 +286,7 @@ builder.defineStreamHandler(async function(args) {
                 if (subtitle.url) {
                     const sub = {
                         url: subtitle.url,
-                        lang: subtitle.baslik // Varsayılan Türkçe
+                        lang: 'tr' // Varsayılan Türkçe
                     };
 
                     // VTT formatını belirt
