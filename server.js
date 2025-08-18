@@ -43,7 +43,7 @@ app.get('/debug/m3u8', async (req, res) => {
         }
 
         const axios = require('axios');
-        
+
         console.log(`🔍 Test M3U8 parse: ${url}`);
         const response = await axios.get(url, {
             headers: {
@@ -60,46 +60,46 @@ app.get('/debug/m3u8', async (req, res) => {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
-            
+
             // Subtitle tracks
             if (line.startsWith('#EXT-X-MEDIA:TYPE=SUBTITLES')) {
                 const subtitle = { line: line };
-                
+
                 const langMatch = line.match(/LANGUAGE="([^"]+)"/);
                 if (langMatch) subtitle.lang = langMatch[1];
-                
+
                 const nameMatch = line.match(/NAME="([^"]+)"/);
                 if (nameMatch) subtitle.label = nameMatch[1];
-                
+
                 const uriMatch = line.match(/URI="([^"]+)"/);
                 if (uriMatch) subtitle.url = uriMatch[1];
-                
+
                 subtitles.push(subtitle);
             }
-            
+
             // Audio tracks
             if (line.startsWith('#EXT-X-MEDIA:TYPE=AUDIO')) {
                 const audio = { line: line };
-                
+
                 const langMatch = line.match(/LANGUAGE="([^"]+)"/);
                 if (langMatch) audio.lang = langMatch[1];
-                
+
                 const nameMatch = line.match(/NAME="([^"]+)"/);
                 if (nameMatch) audio.name = nameMatch[1];
-                
+
                 audioTracks.push(audio);
             }
 
             // Stream info
             if (line.startsWith('#EXT-X-STREAM-INF')) {
                 const stream = { line: line };
-                
+
                 const bandwidthMatch = line.match(/BANDWIDTH=(\d+)/);
                 if (bandwidthMatch) stream.bandwidth = parseInt(bandwidthMatch[1]);
-                
+
                 const resolutionMatch = line.match(/RESOLUTION=(\d+x\d+)/);
                 if (resolutionMatch) stream.resolution = resolutionMatch[1];
-                
+
                 videoTracks.push(stream);
             }
         }
@@ -116,7 +116,7 @@ app.get('/debug/m3u8', async (req, res) => {
             rawContent: content.substring(0, 1000) + (content.length > 1000 ? '...' : '')
         });
     } catch (error) {
-        res.status(500).json({ 
+        res.status(500).json({
             error: error.message,
             timestamp: new Date().toISOString()
         });

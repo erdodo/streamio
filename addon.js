@@ -8,7 +8,7 @@ const API_HEADERS = {
     'X-Locale': 'en-US',
     'X-Role': 'root',
     'X-Authenticator': 'basic',
-    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInRlbXAiOnRydWUsImlhdCI6MTc1NTQyNTMxMSwic2lnbkluVGltZSI6MTc1NTQyNTMxMTU5NywiZXhwIjoxNzU1Njg0NTExLCJqdGkiOiJlNDhjZGU2Mi0yODkwLTRlNzQtYTkzNC00NmJhNGI1ZjhhM2MifQ.kSgJBfD3lUWses3SvlcxVEsca5vTZdo-5OgRh055YXg',
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInJvbGVOYW1lIjoicm9vdCIsImlhdCI6MTc1NTUxMzAxMywiZXhwIjozMzMxMzExMzAxM30.pdsffP79aEvVPYr3LlkRAC_CuRILSOXH0uZrhxUiE5s',
     'X-App': 'erdoFlix',
     'X-Timezone': '+03:00',
     'X-Hostname': 'app.erdoganyesil.org'
@@ -131,19 +131,19 @@ async function parseM3U8(url) {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
-            
+
             // Subtitle tracks
             if (line.startsWith('#EXT-X-MEDIA:TYPE=SUBTITLES')) {
                 const subtitle = {};
-                
+
                 // Language
                 const langMatch = line.match(/LANGUAGE="([^"]+)"/);
                 if (langMatch) subtitle.lang = langMatch[1];
-                
+
                 // Name/Label
                 const nameMatch = line.match(/NAME="([^"]+)"/);
                 if (nameMatch) subtitle.label = nameMatch[1];
-                
+
                 // URI
                 const uriMatch = line.match(/URI="([^"]+)"/);
                 if (uriMatch) {
@@ -154,7 +154,7 @@ async function parseM3U8(url) {
                         subtitle.url = baseUrl + subtitle.url;
                     }
                 }
-                
+
                 // Default
                 const isDefault = line.includes('DEFAULT=YES');
                 if (isDefault) subtitle.default = true;
@@ -164,20 +164,20 @@ async function parseM3U8(url) {
                     subtitles.push(subtitle);
                 }
             }
-            
+
             // Audio tracks
             if (line.startsWith('#EXT-X-MEDIA:TYPE=AUDIO')) {
                 const audio = {};
-                
+
                 const langMatch = line.match(/LANGUAGE="([^"]+)"/);
                 if (langMatch) audio.lang = langMatch[1];
-                
+
                 const nameMatch = line.match(/NAME="([^"]+)"/);
                 if (nameMatch) audio.name = nameMatch[1];
-                
+
                 const isDefault = line.includes('DEFAULT=YES');
                 if (isDefault) audio.default = true;
-                
+
                 audioTracks.push(audio);
             }
         }
@@ -203,7 +203,7 @@ async function validateStreamUrl(url) {
                 return status < 500; // 4xx'ler de geçerli sayılsın
             }
         });
-        
+
         const isValid = response.status >= 200 && response.status < 400;
         console.log(`Stream URL ${url} - Status: ${response.status}, Geçerli: ${isValid}`);
         return isValid;
@@ -443,7 +443,7 @@ builder.defineStreamHandler(async function(args) {
             if (!source.url) continue;
 
             console.log(`🔍 Kaynak işleniyor: "${source.baslik}" - ${source.url}`);
-            
+
             // Stream URL'sini doğrula
             const isValidUrl = await validateStreamUrl(source.url);
             if (!isValidUrl) {
@@ -465,7 +465,7 @@ builder.defineStreamHandler(async function(args) {
             if (source.url.toLowerCase().includes('.m3u8')) {
                 console.log(`🔍 M3U8 dosyası parse ediliyor: ${source.url}`);
                 const m3u8Data = await parseM3U8(source.url);
-                
+
                 // Embedded altyazıları ekle
                 if (m3u8Data.subtitles.length > 0) {
                     console.log(`📝 M3U8'den ${m3u8Data.subtitles.length} embedded altyazı bulundu`);
@@ -535,12 +535,12 @@ builder.defineStreamHandler(async function(args) {
         });
 
         console.log(`🎯 Film ${movieId} için ${streams.length} geçerli stream döndürülüyor`);
-        
+
         if (streams.length === 0) {
             console.log(`⚠️ Film ${movieId} için hiç geçerli stream bulunamadı`);
         }
 
-        return Promise.resolve({ 
+        return Promise.resolve({
             streams: streams,
             cacheMaxAge: 1800 // 30 dakika cache
         });
