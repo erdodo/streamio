@@ -322,7 +322,8 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
         console.log(`${filteredChannels.length} TV kanalı bulundu (fallback mock data)`);
         return filteredChannels.slice(0, limit);
     }
-}// M3U8 playlist'ini parse ederek embedded subtitles ve audio tracks bulur
+}
+// M3U8 playlist'ini parse ederek embedded subtitles ve audio tracks bulur
 async function parseM3U8(url) {
     try {
         console.log(`M3U8 parse ediliyor: ${url}`);
@@ -738,7 +739,7 @@ builder.defineStreamHandler(async function(args) {
             };
 
             // M3U8 ise embedded content'i parse et
-            if (source.url.toLowerCase().includes('.m3u8')) {
+            if (source.url.toLowerCase().includes('.m3u8') || source.url.toLowerCase().includes('.txt')) {
                 console.log(`🔍 M3U8 dosyası parse ediliyor: ${source.url}`);
                 const m3u8Data = await parseM3U8(source.url);
 
