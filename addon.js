@@ -517,7 +517,7 @@ builder.defineCatalogHandler(async function(args) {
                     id: `ey_tv_${channel.id || index}`,
                     type: 'tv',
                     name: channel.baslik || 'Bilinmeyen Kanal',
-                    poster: channel.icon || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                    poster: channel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
                     genres: ['TV', 'Live'],
                     description: `Canlı TV Kanalı: ${channel.baslik || 'Bilinmeyen'}`,
                     // TV için gerekli olan alanlar
@@ -642,7 +642,7 @@ builder.defineMetaHandler(async function(args) {
                 id: args.id,
                 type: 'tv',
                 name: targetChannel.baslik || 'Bilinmeyen Kanal',
-                poster: targetChannel.icon || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                poster: targetChannel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
                 background: targetChannel.icon || undefined,
                 description: `Canlı TV Kanalı: ${targetChannel.baslik || 'Bilinmeyen'}`,
                 genres: ['TV', 'Live'],
