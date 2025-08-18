@@ -17,7 +17,7 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.0.8",
+    "version": "1.0.9",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -442,14 +442,14 @@ builder.defineStreamHandler(async function(args) {
 
         // TMDB ID'yi film verilerinden al
         const tmdbId = targetMovie.tmdb_id || targetMovie.imdb_id;
-        
+
         // Eğer TMDB ID varsa Videasy'den iframe stream'leri de ekle
         if (tmdbId) {
             console.log(`🎭 TMDB ID ${tmdbId} için Videasy iframe kaynakları aranıyor...`);
             try {
                 const videasyStreams = await videasyExtractor.extractStreams(tmdbId);
                 console.log(`🎬 Videasy'den ${videasyStreams.length} iframe stream bulundu`);
-                
+
                 // Videasy stream'lerini ana stream listesine ekle
                 for (const videasyStream of videasyStreams) {
                     streams.push({

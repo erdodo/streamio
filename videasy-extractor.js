@@ -70,7 +70,7 @@ class VideasyExtractor {
                     console.log(`✅ Videasy API bulundu: ${endpoint}`);
                     return this.parseAPISources(response.data.sources);
                 }
-                
+
                 if (response.data && response.data.url) {
                     console.log(`✅ Videasy direkt URL bulundu: ${endpoint}`);
                     return [{
@@ -93,7 +93,7 @@ class VideasyExtractor {
      */
     parseAPISources(sources) {
         const streams = [];
-        
+
         if (Array.isArray(sources)) {
             sources.forEach(source => {
                 if (source.file || source.url || source.src) {
@@ -125,10 +125,10 @@ class VideasyExtractor {
      */
     async extractWithPuppeteer(tmdbId) {
         let browser = null;
-        
+
         try {
             console.log(`🎭 Puppeteer ile Videasy analizi başlıyor: ${tmdbId}`);
-            
+
             browser = await puppeteer.launch({
                 headless: true,
                 args: [
@@ -143,17 +143,17 @@ class VideasyExtractor {
             });
 
             const page = await browser.newPage();
-            
+
             // User agent ayarla
             await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-            
+
             const videoStreams = [];
-            
+
             // Network isteklerini dinle
             page.on('response', async (response) => {
                 const url = response.url();
                 const contentType = response.headers()['content-type'] || '';
-                
+
                 // Video stream'lerini yakala
                 if (this.isVideoStream(url, contentType)) {
                     console.log(`🎬 Video stream yakalandı: ${url}`);
@@ -168,8 +168,8 @@ class VideasyExtractor {
 
             const iframeUrl = this.getVideasyUrl(tmdbId);
             console.log(`📺 Iframe yükleniyor: ${iframeUrl}`);
-            
-            await page.goto(iframeUrl, { 
+
+            await page.goto(iframeUrl, {
                 waitUntil: 'networkidle2',
                 timeout: 30000
             });
@@ -192,7 +192,7 @@ class VideasyExtractor {
             // DOM'dan video elementlerini kontrol et
             const domVideos = await page.evaluate(() => {
                 const videos = [];
-                
+
                 // Video elementleri
                 document.querySelectorAll('video').forEach(video => {
                     if (video.src) {
@@ -203,7 +203,7 @@ class VideasyExtractor {
                             source: 'video-element'
                         });
                     }
-                    
+
                     // Source elementleri
                     video.querySelectorAll('source').forEach(source => {
                         if (source.src) {
@@ -220,7 +220,7 @@ class VideasyExtractor {
                 // Script'lerden URL'leri çıkar
                 document.querySelectorAll('script').forEach(script => {
                     const content = script.textContent;
-                    
+
                     // M3U8 URL'leri
                     const m3u8Matches = content.match(/https?:\/\/[^\s'"]+\.m3u8[^\s'"']*/g);
                     if (m3u8Matches) {
@@ -233,7 +233,7 @@ class VideasyExtractor {
                             });
                         });
                     }
-                    
+
                     // MP4 URL'leri
                     const mp4Matches = content.match(/https?:\/\/[^\s'"]+\.mp4[^\s'"']*/g);
                     if (mp4Matches) {
@@ -253,12 +253,12 @@ class VideasyExtractor {
 
             // Network'den yakalanan ve DOM'dan çıkarılan stream'leri birleştir
             const allStreams = [...videoStreams, ...domVideos];
-            
+
             // Duplicate'leri kaldır
             const uniqueStreams = this.removeDuplicates(allStreams);
-            
+
             console.log(`📊 Toplam ${uniqueStreams.length} video stream bulundu`);
-            
+
             return uniqueStreams;
 
         } catch (error) {
@@ -277,22 +277,22 @@ class VideasyExtractor {
     isVideoStream(url, contentType) {
         const videoContentTypes = ['video/', 'application/x-mpegurl', 'application/vnd.apple.mpegurl'];
         const videoExtensions = ['.m3u8', '.mp4', '.mkv', '.avi', '.webm', '.ts'];
-        
+
         // Content type kontrolü
         if (videoContentTypes.some(type => contentType.toLowerCase().includes(type))) {
             return true;
         }
-        
+
         // URL extension kontrolü
         if (videoExtensions.some(ext => url.toLowerCase().includes(ext))) {
             return true;
         }
-        
+
         // Manifest keyword'leri
         if (url.includes('manifest') || url.includes('playlist')) {
             return true;
         }
-        
+
         return false;
     }
 
@@ -304,12 +304,12 @@ class VideasyExtractor {
         if (qualityMatches) {
             return qualityMatches[1];
         }
-        
+
         if (url.includes('1080')) return '1080p';
         if (url.includes('720')) return '720p';
         if (url.includes('480')) return '480p';
         if (url.includes('360')) return '360p';
-        
+
         return 'Auto';
     }
 
@@ -343,7 +343,7 @@ class VideasyExtractor {
 
             // Önce API'yi dene
             let streams = await this.tryAPIEndpoints(tmdbId);
-            
+
             // API'den sonuç alınamazsa Puppeteer'ı kullan
             if (!streams || streams.length === 0) {
                 console.log('🎭 API\'den sonuc alinamadi, Puppeteer deneniyor...');
@@ -352,10 +352,10 @@ class VideasyExtractor {
 
             // Sonuçları formatla
             const formattedStreams = this.formatForStremio(streams, tmdbId);
-            
+
             // Cache'e kaydet
             this.setCache(tmdbId, formattedStreams);
-            
+
             console.log(`✅ Videasy extraction tamamlandı: ${formattedStreams.length} stream`);
             return formattedStreams;
 
@@ -398,7 +398,7 @@ class VideasyExtractor {
                 },
                 timeout: 5000
             });
-            
+
             return response.status === 200;
         } catch (error) {
             return false;
