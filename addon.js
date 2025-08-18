@@ -16,7 +16,7 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.0.9",
+    "version": "1.1.0",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -74,10 +74,10 @@ const manifest = {
 };
 
 // API Helper Functions
-async function fetchMovies(limit = 1000) {
+async function fetchMovies(limit = 100, searchQuery = null, genreFilter = null) {
     try {
-        // Sadece kaynağı olan filmleri getir
-        const filter = {
+        // Base filter - sadece kaynağı olan filmler
+        const baseFilter = {
             "$and": [
                 {
                     "kaynaklar_id": {
@@ -88,18 +88,44 @@ async function fetchMovies(limit = 1000) {
                 }
             ]
         };
-        const filterParam = encodeURIComponent(JSON.stringify(filter));
+
+        // Search query varsa filtre ekle
+        if (searchQuery && searchQuery.length >= 2) {
+            const searchConditions = {
+                "$or": [
+                    { "baslik": { "$includes": searchQuery } },
+                    { "orjinal_baslik": { "$includes": searchQuery } },
+                    { "detay": { "$includes": searchQuery } }
+                ]
+            };
+            baseFilter["$and"].push(searchConditions);
+        }
+
+        // Genre filter varsa ekle
+        if (genreFilter) {
+            const genreCondition = {
+                "turler": {
+                    "baslik": { "$includes": genreFilter }
+                }
+            };
+            baseFilter["$and"].push(genreCondition);
+        }
+
+        const filterParam = encodeURIComponent(JSON.stringify(baseFilter));
         const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}&appends[]=turler&appends[]=kaynaklar_id&appends[]=film_altyazilari_id`;
-        console.log(`API'ye istek gönderiliyor (sadece kaynağı olan filmler): ${url}`);
+        
+        console.log(`API'ye istek gönderiliyor (filtreli): ${url.substring(0, 150)}...`);
+        if (searchQuery) console.log(`🔍 Arama terimi: "${searchQuery}"`);
+        if (genreFilter) console.log(`🎭 Tür filtresi: "${genreFilter}"`);
 
         const response = await axios.get(url, {
             headers: API_HEADERS,
-            timeout: 10000
+            timeout: 15000
         });
 
         console.log(`API yanıtı: ${response.status}`);
-        console.log(`API'den ${response.data.data?.length || 0} kaynağı olan film alındı`);
-        console.log(`Toplam kaynaklı film sayısı: ${response.data.meta?.count || 'bilinmiyor'}`);
+        console.log(`API'den ${response.data.data?.length || 0} filtreli film alındı`);
+        console.log(`Toplam filtreli film sayısı: ${response.data.meta?.count || 'bilinmiyor'}`);
         return response.data.data || [];
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
@@ -228,7 +254,7 @@ builder.defineCatalogHandler(async function(args) {
         const skip = parseInt(args.extra?.skip) || 0;
         const pageSize = 50;
 
-        // Search parametresi
+        // Search parametresi temizle
         let searchQuery = args.extra?.search;
         if (searchQuery) {
             searchQuery = searchQuery.split('.json')[0].split('?')[0].trim();
@@ -242,57 +268,22 @@ builder.defineCatalogHandler(async function(args) {
             }
         }
 
-        console.log(`Search query: ${searchQuery || 'Yok'}`);
-
-        // Genre filtresi
+        // Genre filtresi temizle
         let selectedGenre = args.extra?.genre;
-        // Browser'dan gelen extra parametreleri temizle
         if (selectedGenre) {
             selectedGenre = selectedGenre.split('.json')[0].split('?')[0];
         }
-        console.log(`Genre filtresi: ${selectedGenre || 'Yok'}`);
 
-        const movies = await fetchMovies(500); // Search için daha fazla film
-        console.log(`${movies.length} film alındı, catalog: ${args.id}, skip: ${skip}, genre: ${selectedGenre || 'Hepsi'}, search: ${searchQuery || 'Yok'}`);
+        console.log(`🎬 Catalog parametreleri: catalog=${args.id}, skip=${skip}, search="${searchQuery || 'Yok'}", genre="${selectedGenre || 'Yok'}"`);
 
-        // Search filtresini önce uygula
-        let filteredMovies = movies;
-        if (searchQuery && searchQuery.length >= 2) {
-            const searchTerm = searchQuery.toLowerCase();
-            filteredMovies = movies.filter(movie => {
-                const movieTitle = (movie.baslik || '').toLowerCase();
-                const originalTitle = (movie.orjinal_baslik || '').toLowerCase();
-                const description = (movie.detay || '').toLowerCase();
+        // API'den doğrudan filtreli sonuçları al
+        const totalLimit = skip + pageSize + 50; // Sayfalama için biraz fazla al
+        const movies = await fetchMovies(totalLimit, searchQuery, selectedGenre);
+        
+        console.log(`📊 API'den ${movies.length} filtreli film alındı`);
 
-                // Film türlerini de ara
-                const genres = movie.turler?.map(tur => tur.baslik.toLowerCase()) || [];
-                const genreMatch = genres.some(genre => genre.includes(searchTerm));
-
-                return movieTitle.includes(searchTerm) ||
-                       originalTitle.includes(searchTerm) ||
-                       description.includes(searchTerm) ||
-                       genreMatch;
-            });
-            console.log(`Search "${searchQuery}" filtresi uygulandı: ${filteredMovies.length} film kaldı`);
-        }
-
-        // Genre filtresini uygula
-        if (selectedGenre) {
-            filteredMovies = filteredMovies.filter(movie => {
-                const movieGenres = movie.turler?.map(tur => tur.baslik.toLowerCase()) || [];
-                return movieGenres.some(genre =>
-                    genre.includes(selectedGenre.toLowerCase()) ||
-                    selectedGenre.toLowerCase().includes(genre) ||
-                    // Türkçe karakter desteği için
-                    genre.replace('ı', 'i').replace('ü', 'u').replace('ö', 'o').replace('ş', 's').replace('ç', 'c').replace('ğ', 'g').includes(selectedGenre.toLowerCase()) ||
-                    selectedGenre.toLowerCase().replace('ı', 'i').replace('ü', 'u').replace('ö', 'o').replace('ş', 's').replace('ç', 'c').replace('ğ', 'g').includes(genre)
-                );
-            });
-            console.log(`Genre "${selectedGenre}" filtresi uygulandı: ${filteredMovies.length} film kaldı`);
-        }
-
-        // Sayfalama uygula
-        const paginatedMovies = filteredMovies.slice(skip, skip + pageSize);
+        // Sadece sayfalama uygula (filtreleme API'de yapıldı)
+        const paginatedMovies = movies.slice(skip, skip + pageSize);
 
         const metas = paginatedMovies.map(movie => {
             // Film türlerini çıkar
@@ -318,10 +309,10 @@ builder.defineCatalogHandler(async function(args) {
             };
         });
 
-        console.log(`Catalog '${args.id}'da ${metas.length} film döndürülüyor (skip: ${skip})`);
+        console.log(`✅ Catalog '${args.id}' tamamlandı: ${metas.length} film döndürüldü (skip: ${skip})`);
         return Promise.resolve({
             metas: metas,
-            cacheMaxAge: args.id === 'erdoflix_top' ? 3600 : 1800 // Popüler için daha uzun cache
+            cacheMaxAge: args.id === 'erdoflix_search' ? 900 : 1800 // Search için daha kısa cache
         });
     } catch (error) {
         console.log(`Catalog hatası: ${error.message}`);
@@ -349,7 +340,7 @@ builder.defineMetaHandler(async function(args) {
 
     try {
         // API'den filmleri al
-        const movies = await fetchMovies(300);
+        const movies = await fetchMovies(300, null, null); // Meta için filtreleme yok
         const targetMovie = movies.find(movie => movie.id.toString() === movieId);
 
         if (!targetMovie) {
@@ -424,7 +415,7 @@ builder.defineStreamHandler(async function(args) {
 
     try {
         // Filmler listesinden embedded verilerle birlikte al
-        const movies = await fetchMovies(300);
+        const movies = await fetchMovies(300, null, null); // Stream için filtreleme yok
         const targetMovie = movies.find(movie => movie.id.toString() === movieId);
 
         if (!targetMovie) {
