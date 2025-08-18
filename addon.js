@@ -5,11 +5,11 @@ const axios = require("axios");
 const API_BASE_URL = 'https://app.erdoganyesil.org/api';
 const API_HEADERS = {
     'accept': 'application/json',
-    'X-Locale': 'en-US',
+    'X-Locale': 'tr-TR',
     'X-Role': 'root',
     'X-Authenticator': 'basic',
     'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInJvbGVOYW1lIjoicm9vdCIsImlhdCI6MTc1NTUxMzAxMywiZXhwIjozMzMxMzExMzAxM30.pdsffP79aEvVPYr3LlkRAC_CuRILSOXH0uZrhxUiE5s',
-    'X-App': 'erdoFlix',
+    'X-App': 'main',
     'X-Timezone': '+03:00',
     'X-Hostname': 'app.erdoganyesil.org'
 };
@@ -166,39 +166,22 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
     try {
         console.log(`TV kanalları getiriliyor - arama: ${searchQuery || 'yok'}, limit: ${limit}`);
 
-        // TV kategorisindeki filmler için base filter
-        const baseFilter = {
-            "$and": [
-                {
-                    "kaynaklar_id": {
-                        "id": {
-                            "$notEmpty": true
-                        }
-                    }
-                },
-                {
-                    "turler": {
-                        "baslik": { "$in": ["TV", "Canlı", "Haber", "Spor", "Müzik"] }
-                    }
-                }
-            ]
-        };
+        // Base filter
+        let baseFilter = {};
 
         // Arama için filter parametresi ekle
         if (searchQuery && searchQuery.length >= 2) {
-            const searchConditions = {
+            baseFilter = {
                 "$or": [
-                    { "baslik": { "$includes": searchQuery } },
-                    { "orjinal_baslik": { "$includes": searchQuery } }
+                    {"baslik": {"$includes": searchQuery}}
                 ]
             };
-            baseFilter["$and"].push(searchConditions);
         }
 
         const filterParam = encodeURIComponent(JSON.stringify(baseFilter));
-        const apiUrl = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}&appends[]=turler&appends[]=kaynaklar_id`;
+        const apiUrl = `${API_BASE_URL}/tv_list:list?filter=${filterParam}&pageSize=${limit}`;
 
-        console.log(`TV API URL: ${apiUrl.substring(0, 150)}...`);
+        console.log(`TV API URL: ${apiUrl}`);
 
         const response = await axios.get(apiUrl, {
             headers: API_HEADERS,
@@ -210,21 +193,8 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             throw new Error('TV verisi bulunamadı');
         }
 
-        console.log(`${response.data.data.length} TV kanalı bulundu (filmler API'sinden)`);
-        
-        // Filmler API'sinden gelen veriyi TV kanalı formatına çevir
-        const tvChannels = response.data.data.map((film, index) => ({
-            id: film.id,
-            baslik: film.baslik || film.orjinal_baslik,
-            icon: film.poster || `https://via.placeholder.com/300x450/ff6b35/ffffff?text=${encodeURIComponent(film.baslik || 'TV')}`,
-            url_1: film.kaynaklar_id?.[0]?.url || null,
-            url_2: film.kaynaklar_id?.[1]?.url || null,
-            url_3: film.kaynaklar_id?.[2]?.url || null,
-            url_4: film.kaynaklar_id?.[3]?.url || null,
-            detay: film.detay
-        }));
-
-        return tvChannels.slice(0, limit);
+        console.log(`${response.data.data.length} TV kanalı bulundu (gerçek TV API'sinden)`);
+        return response.data.data.slice(0, limit);
 
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
