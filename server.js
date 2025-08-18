@@ -128,7 +128,7 @@ app.get('/debug/tv', async (req, res) => {
     try {
         const { fetchTVChannels } = require('./addon.js');
         const channels = await fetchTVChannels(5, null);
-        
+
         res.json({
             success: true,
             count: channels.length,
