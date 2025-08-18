@@ -16,7 +16,7 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.0.4",
+    "version": "1.0.6",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -31,6 +31,10 @@ const manifest = {
             "id": "erdoflix_movies",
             "name": "ErdoFlix Filmler",
             "extra": [
+                {
+                    "name": "search",
+                    "isRequired": false
+                },
                 {
                     "name": "genre",
                     "options": ["aksiyon", "komedi", "dram", "korku", "bilim-kurgu", "gerilim", "romantik", "tarih", "aile", "suç"],
@@ -50,6 +54,17 @@ const manifest = {
                 {
                     "name": "skip",
                     "isRequired": false
+                }
+            ]
+        },
+        {
+            "type": "movie",
+            "id": "erdoflix_search",
+            "name": "ErdoFlix Arama",
+            "extra": [
+                {
+                    "name": "search",
+                    "isRequired": true
                 }
             ]
         }
@@ -76,9 +91,21 @@ const manifest = {
 // API Helper Functions
 async function fetchMovies(limit = 1000) {
     try {
-        const filterParam = encodeURIComponent('{}');
+        // Sadece kaynağı olan filmleri getir
+        const filter = {
+            "$and": [
+                {
+                    "kaynaklar_id": {
+                        "id": {
+                            "$notEmpty": true
+                        }
+                    }
+                }
+            ]
+        };
+        const filterParam = encodeURIComponent(JSON.stringify(filter));
         const url = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}&appends[]=turler&appends[]=kaynaklar_id&appends[]=film_altyazilari_id`;
-        console.log(`API'ye istek gönderiliyor: ${url}`);
+        console.log(`API'ye istek gönderiliyor (sadece kaynağı olan filmler): ${url}`);
 
         const response = await axios.get(url, {
             headers: API_HEADERS,
@@ -86,8 +113,8 @@ async function fetchMovies(limit = 1000) {
         });
 
         console.log(`API yanıtı: ${response.status}`);
-        console.log(`API'den ${response.data.data?.length || 0} film alındı`);
-        console.log(`Toplam film sayısı: ${response.data.meta?.count || 'bilinmiyor'}`);
+        console.log(`API'den ${response.data.data?.length || 0} kaynağı olan film alındı`);
+        console.log(`Toplam kaynaklı film sayısı: ${response.data.meta?.count || 'bilinmiyor'}`);
         return response.data.data || [];
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
@@ -107,7 +134,7 @@ const builder = new addonBuilder(manifest);
 builder.defineCatalogHandler(async function(args) {
     console.log(`Catalog istegi: ${JSON.stringify(args)}`);
 
-    if (args.type !== 'movie' || !['erdoflix_movies', 'erdoflix_top'].includes(args.id)) {
+    if (args.type !== 'movie' || !['erdoflix_movies', 'erdoflix_top', 'erdoflix_search'].includes(args.id)) {
         return Promise.resolve({ metas: [] });
     }
 
@@ -115,6 +142,22 @@ builder.defineCatalogHandler(async function(args) {
         // Skip parametresi için sayfalama
         const skip = parseInt(args.extra?.skip) || 0;
         const pageSize = args.id === 'erdoflix_top' ? 20 : 50; // Popüler için daha az
+
+        // Search parametresi
+        let searchQuery = args.extra?.search;
+        if (searchQuery) {
+            searchQuery = searchQuery.split('.json')[0].split('?')[0].trim();
+        }
+
+        // Search catalog için özel kontrol
+        if (args.id === 'erdoflix_search') {
+            if (!searchQuery || searchQuery.length < 2) {
+                console.log(`Search catalog için geçersiz query: "${searchQuery}"`);
+                return Promise.resolve({ metas: [] });
+            }
+        }
+
+        console.log(`Search query: ${searchQuery || 'Yok'}`);
 
         // Genre filtresi
         let selectedGenre = args.extra?.genre;
@@ -124,13 +167,33 @@ builder.defineCatalogHandler(async function(args) {
         }
         console.log(`Genre filtresi: ${selectedGenre || 'Yok'}`);
 
-        const movies = await fetchMovies(300);
-        console.log(`${movies.length} film alındı, catalog: ${args.id}, skip: ${skip}, genre: ${selectedGenre || 'Hepsi'}`);
+        const movies = await fetchMovies(500); // Search için daha fazla film
+        console.log(`${movies.length} film alındı, catalog: ${args.id}, skip: ${skip}, genre: ${selectedGenre || 'Hepsi'}, search: ${searchQuery || 'Yok'}`);
+
+        // Search filtresini önce uygula
+        let filteredMovies = movies;
+        if (searchQuery && searchQuery.length >= 2) {
+            const searchTerm = searchQuery.toLowerCase();
+            filteredMovies = movies.filter(movie => {
+                const movieTitle = (movie.baslik || '').toLowerCase();
+                const originalTitle = (movie.orjinal_baslik || '').toLowerCase();
+                const description = (movie.detay || '').toLowerCase();
+
+                // Film türlerini de ara
+                const genres = movie.turler?.map(tur => tur.baslik.toLowerCase()) || [];
+                const genreMatch = genres.some(genre => genre.includes(searchTerm));
+
+                return movieTitle.includes(searchTerm) ||
+                       originalTitle.includes(searchTerm) ||
+                       description.includes(searchTerm) ||
+                       genreMatch;
+            });
+            console.log(`Search "${searchQuery}" filtresi uygulandı: ${filteredMovies.length} film kaldı`);
+        }
 
         // Genre filtresini uygula
-        let filteredMovies = movies;
         if (selectedGenre) {
-            filteredMovies = movies.filter(movie => {
+            filteredMovies = filteredMovies.filter(movie => {
                 const movieGenres = movie.turler?.map(tur => tur.baslik.toLowerCase()) || [];
                 return movieGenres.some(genre =>
                     genre.includes(selectedGenre.toLowerCase()) ||
@@ -141,9 +204,7 @@ builder.defineCatalogHandler(async function(args) {
                 );
             });
             console.log(`Genre "${selectedGenre}" filtresi uygulandı: ${filteredMovies.length} film kaldı`);
-        }
-
-        // Popüler catalog için tersten sırala (en yeni önce)
+        }        // Popüler catalog için tersten sırala (en yeni önce)
         let processedMovies = args.id === 'erdoflix_top'
             ? filteredMovies.slice().reverse()
             : filteredMovies;
