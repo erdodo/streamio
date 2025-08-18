@@ -28,7 +28,7 @@ const manifest = {
     "catalogs": [
         {
             "type": "movie",
-            "id": "erdoflix_movies",
+            "id": "film_all",
             "name": "ErdoFlix Filmler",
             "extra": [
                 {
@@ -44,7 +44,7 @@ const manifest = {
         },
         {
             "type": "movie",
-            "id": "erdoflix_search",
+            "id": "film_search",
             "name": "ErdoFlix Arama",
             "extra": [
                 {
@@ -55,7 +55,7 @@ const manifest = {
         },
         {
             "type": "tv",
-            "id": "erdoflix_tv_channels",
+            "id": "film_tv",
             "name": "ErdoFlix TV Kanalları",
             "extra": [
                 {
@@ -66,7 +66,7 @@ const manifest = {
         },
         {
             "type": "tv",
-            "id": "erdoflix_tv_search",
+            "id": "film_tv_search",
             "name": "ErdoFlix TV Arama",
             "extra": [
                 {
@@ -166,23 +166,39 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
     try {
         console.log(`TV kanalları getiriliyor - arama: ${searchQuery || 'yok'}, limit: ${limit}`);
 
-        // Gerçek TV API endpoint'ini kullan - farklı endpoint dene
-        let apiUrl = `${API_BASE_URL}/tv_kanallar:list`;
+        // TV kategorisindeki filmler için base filter
+        const baseFilter = {
+            "$and": [
+                {
+                    "kaynaklar_id": {
+                        "id": {
+                            "$notEmpty": true
+                        }
+                    }
+                },
+                {
+                    "turler": {
+                        "baslik": { "$in": ["TV", "Canlı", "Haber", "Spor", "Müzik"] }
+                    }
+                }
+            ]
+        };
 
         // Arama için filter parametresi ekle
         if (searchQuery && searchQuery.length >= 2) {
-            const searchFilter = {
+            const searchConditions = {
                 "$or": [
-                    {"baslik": {"$includes": searchQuery}}
+                    { "baslik": { "$includes": searchQuery } },
+                    { "orjinal_baslik": { "$includes": searchQuery } }
                 ]
             };
-            apiUrl += `?filter=${encodeURIComponent(JSON.stringify(searchFilter))}`;
+            baseFilter["$and"].push(searchConditions);
         }
 
-        // Sayfalama parametresi ekle
-        apiUrl += `${searchQuery ? '&' : '?'}pageSize=${limit}&sort=["id"]`;
+        const filterParam = encodeURIComponent(JSON.stringify(baseFilter));
+        const apiUrl = `${API_BASE_URL}/filmler:list?filter=${filterParam}&pageSize=${limit}&appends[]=turler&appends[]=kaynaklar_id`;
 
-        console.log(`TV API URL: ${apiUrl}`);
+        console.log(`TV API URL: ${apiUrl.substring(0, 150)}...`);
 
         const response = await axios.get(apiUrl, {
             headers: API_HEADERS,
@@ -191,11 +207,24 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
 
         if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
             console.log('TV kanalları verisi bulunamadı');
-            return [];
+            throw new Error('TV verisi bulunamadı');
         }
 
-        console.log(`${response.data.data.length} TV kanalı bulundu`);
-        return response.data.data.slice(0, limit);
+        console.log(`${response.data.data.length} TV kanalı bulundu (filmler API'sinden)`);
+        
+        // Filmler API'sinden gelen veriyi TV kanalı formatına çevir
+        const tvChannels = response.data.data.map((film, index) => ({
+            id: film.id,
+            baslik: film.baslik || film.orjinal_baslik,
+            icon: film.poster || `https://via.placeholder.com/300x450/ff6b35/ffffff?text=${encodeURIComponent(film.baslik || 'TV')}`,
+            url_1: film.kaynaklar_id?.[0]?.url || null,
+            url_2: film.kaynaklar_id?.[1]?.url || null,
+            url_3: film.kaynaklar_id?.[2]?.url || null,
+            url_4: film.kaynaklar_id?.[3]?.url || null,
+            detay: film.detay
+        }));
+
+        return tvChannels.slice(0, limit);
 
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
@@ -419,7 +448,7 @@ builder.defineCatalogHandler(async function(args) {
     console.log(`Catalog istegi: ${JSON.stringify(args)}`);
 
     // Movie catalog handling
-    if (args.type === 'movie' && ['erdoflix_movies', 'erdoflix_search'].includes(args.id)) {
+    if (args.type === 'movie' && ['film_all', 'film_search'].includes(args.id)) {
         try {
             // Skip parametresi için sayfalama
             const skip = parseInt(args.extra?.skip) || 0;
@@ -432,7 +461,7 @@ builder.defineCatalogHandler(async function(args) {
             }
 
             // Search catalog için özel kontrol
-            if (args.id === 'erdoflix_search') {
+            if (args.id === 'film_search') {
                 if (!searchQuery || searchQuery.length < 2) {
                     console.log(`Search catalog için geçersiz query: "${searchQuery}"`);
                     return Promise.resolve({ metas: [] });
@@ -481,7 +510,7 @@ builder.defineCatalogHandler(async function(args) {
     }
 
     // TV catalog handling
-    else if (args.type === 'tv' && ['erdoflix_tv_channels', 'erdoflix_tv_search'].includes(args.id)) {
+    else if (args.type === 'tv' && ['film_tv', 'film_tv_search'].includes(args.id)) {
         try {
             // Skip parametresi için sayfalama
             const skip = parseInt(args.extra?.skip) || 0;
@@ -494,7 +523,7 @@ builder.defineCatalogHandler(async function(args) {
             }
 
             // Search catalog için özel kontrol
-            if (args.id === 'erdoflix_tv_search') {
+            if (args.id === 'film_tv_search') {
                 if (!searchQuery || searchQuery.length < 2) {
                     console.log(`TV Search catalog için geçersiz query: "${searchQuery}"`);
                     return Promise.resolve({ metas: [] });
