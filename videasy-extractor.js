@@ -1,5 +1,7 @@
-const puppeteer = require('puppeteer');
 const axios = require('axios');
+
+// ARM sistemlerde Puppeteer sorunları olabileceği için API-only mode
+const PUPPETEER_ENABLED = false;
 
 class VideasyExtractor {
     constructor() {
@@ -20,10 +22,18 @@ class VideasyExtractor {
     getCached(tmdbId) {
         const cached = this.cache.get(tmdbId);
         if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
-            console.log(`📋 Cache'den Videasy stream alındı: ${tmdbId}`);
+            console.log(`📋 Cache'den Videasy stream alındı: ${tmdbId} (${cached.data.length} stream)`);
             return cached.data;
         }
         return null;
+    }
+
+    /**
+     * Cache'i temizler
+     */
+    clearCache() {
+        this.cache.clear();
+        console.log(`🗑️ Videasy cache temizlendi`);
     }
 
     /**
@@ -124,10 +134,18 @@ class VideasyExtractor {
      * Puppeteer ile iframe'i analiz eder
      */
     async extractWithPuppeteer(tmdbId) {
+        if (!PUPPETEER_ENABLED) {
+            console.log('❌ Puppeteer devre dışı - ARM uyumluluk sorunu');
+            return [];
+        }
+
         let browser = null;
 
         try {
             console.log(`🎭 Puppeteer ile Videasy analizi başlıyor: ${tmdbId}`);
+
+            // Puppeteer require et (sadece gerektiğinde)
+            const puppeteer = require('puppeteer');
 
             // ARM sistemler için Chrome/Chromium path'lerini dene
             const possiblePaths = [

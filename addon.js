@@ -1,6 +1,5 @@
 const { addonBuilder } = require("stremio-addon-sdk");
 const axios = require("axios");
-const VideasyExtractor = require("./videasy-extractor");
 
 // API Configuration
 const API_BASE_URL = 'https://app.erdoganyesil.org/api';
@@ -74,8 +73,7 @@ const manifest = {
     }
 };
 
-// Initialize Videasy Extractor
-const videasyExtractor = new VideasyExtractor();
+// API Helper Functions
 async function fetchMovies(limit = 1000) {
     try {
         // Sadece kaynağı olan filmleri getir
@@ -439,33 +437,6 @@ builder.defineStreamHandler(async function(args) {
         const subtitles = targetMovie.film_altyazilari_id || [];
 
         console.log(`📊 Film ${movieId}: ${sources.length} kaynak, ${subtitles.length} altyazı bulundu`);
-
-        // TMDB ID'yi film verilerinden al
-        const tmdbId = targetMovie.tmdb_id || targetMovie.imdb_id;
-
-        // Eğer TMDB ID varsa Videasy'den iframe stream'leri de ekle
-        if (tmdbId) {
-            console.log(`🎭 TMDB ID ${tmdbId} için Videasy iframe kaynakları aranıyor...`);
-            try {
-                const videasyStreams = await videasyExtractor.extractStreams(tmdbId);
-                console.log(`🎬 Videasy'den ${videasyStreams.length} iframe stream bulundu`);
-
-                // Videasy stream'lerini ana stream listesine ekle
-                for (const videasyStream of videasyStreams) {
-                    streams.push({
-                        url: videasyStream.url,
-                        title: `🎭 ${videasyStream.title}`,
-                        behaviorHints: {
-                            bingeGroup: `erdoflix-videasy-${movieId}`,
-                            countryWhitelist: ['TR', 'US', 'GB']
-                        },
-                        subtitles: videasyStream.subtitles || []
-                    });
-                }
-            } catch (error) {
-                console.log(`❌ Videasy iframe extraction hatası: ${error.message}`);
-            }
-        }
 
         // Her kaynak için stream oluştur
         for (const source of sources) {
