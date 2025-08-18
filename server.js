@@ -123,6 +123,35 @@ app.get('/debug/m3u8', async (req, res) => {
     }
 });
 
+// TV Debug endpoint
+app.get('/debug/tv', async (req, res) => {
+    try {
+        const { fetchTVChannels } = require('./addon.js');
+        const channels = await fetchTVChannels(5, null);
+        
+        res.json({
+            success: true,
+            count: channels.length,
+            channels: channels.map(channel => ({
+                id: channel.id,
+                baslik: channel.baslik,
+                icon: channel.icon,
+                iconExists: !!channel.icon,
+                iconLength: channel.icon?.length || 0,
+                url_1: channel.url_1,
+                rawChannel: channel // Tüm alanları görmek için
+            })),
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
 // Stremio addon router'ını mount et
 const addonRouter = getRouter(addonInterface);
 app.use(addonRouter);

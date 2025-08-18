@@ -166,8 +166,8 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
     try {
         console.log(`TV kanalları getiriliyor - arama: ${searchQuery || 'yok'}, limit: ${limit}`);
 
-        // Gerçek TV API endpoint'ini kullan
-        let apiUrl = `${API_BASE_URL}/tv_list`;
+        // Gerçek TV API endpoint'ini kullan - farklı endpoint dene
+        let apiUrl = `${API_BASE_URL}/tv_kanallar:list`;
 
         // Arama için filter parametresi ekle
         if (searchQuery && searchQuery.length >= 2) {
@@ -212,7 +212,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 1,
                 baslik: "TRT 1",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=TRT1",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/TRT1_logo.svg/1200px-TRT1_logo.svg.png",
                 url_1: "https://tv-trt1.medya.trt.com.tr/master.m3u8",
                 url_2: "https://tv-trt1-dvr.medya.trt.com.tr/master.m3u8",
                 url_3: null,
@@ -221,7 +221,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 2,
                 baslik: "Kanal D",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=KANALD",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Kanal_D_logo.svg/1200px-Kanal_D_logo.svg.png",
                 url_1: "https://demiroren-live.daioncdn.net/kanald/kanald.m3u8",
                 url_2: null,
                 url_3: null,
@@ -230,7 +230,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 3,
                 baslik: "Show TV",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=SHOW",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Show_TV_logo.svg/1200px-Show_TV_logo.svg.png",
                 url_1: "https://ciner-live.daioncdn.net/showtv/showtv.m3u8",
                 url_2: null,
                 url_3: null,
@@ -239,7 +239,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 4,
                 baslik: "ATV",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=ATV",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/ATV_logo.svg/1200px-ATV_logo.svg.png",
                 url_1: "https://trkvz-live.daioncdn.net/atv/atv.m3u8",
                 url_2: null,
                 url_3: null,
@@ -248,7 +248,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 5,
                 baslik: "Star TV",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=STAR",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Star_TV_logo.svg/1200px-Star_TV_logo.svg.png",
                 url_1: "https://dogus-live.daioncdn.net/startv/startv.m3u8",
                 url_2: null,
                 url_3: null,
@@ -257,7 +257,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 6,
                 baslik: "TV8",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV8",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/TV8_logo.svg/1200px-TV8_logo.svg.png",
                 url_1: "https://tv8-live.daioncdn.net/tv8/tv8.m3u8",
                 url_2: null,
                 url_3: null,
@@ -266,7 +266,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 7,
                 baslik: "FOX",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=FOX",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/FOX_Tv_logo.svg/1200px-FOX_Tv_logo.svg.png",
                 url_1: "https://foxtv.blutv.com/blutv_foxtv_live/live.m3u8",
                 url_2: null,
                 url_3: null,
@@ -275,7 +275,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 8,
                 baslik: "CNN Türk",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=CNN",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/CNN_T%C3%BCrk_logo.svg/1200px-CNN_T%C3%BCrk_logo.svg.png",
                 url_1: "https://live.duhnet.tv/S2/HLS_LIVE/cnnturknp/track_4_1000/playlist.m3u8",
                 url_2: null,
                 url_3: null,
@@ -284,7 +284,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 9,
                 baslik: "NTV",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=NTV",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/NTV_logo.svg/1200px-NTV_logo.svg.png",
                 url_1: "https://dogus-live.daioncdn.net/ntv/ntv.m3u8",
                 url_2: null,
                 url_3: null,
@@ -293,7 +293,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
             {
                 id: 10,
                 baslik: "Habertürk",
-                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=HABER",
+                icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/Habert%C3%BCrk_logo.svg/1200px-Habert%C3%BCrk_logo.svg.png",
                 url_1: "https://tv.ensonhaber.com/haberturk/haberturk.m3u8",
                 url_2: null,
                 url_3: null,
@@ -517,7 +517,7 @@ builder.defineCatalogHandler(async function(args) {
                     id: `ey_tv_${channel.id || index}`,
                     type: 'tv',
                     name: channel.baslik || 'Bilinmeyen Kanal',
-                    poster: channel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                    poster: channel.icon || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
                     genres: ['TV', 'Live'],
                     description: `Canlı TV Kanalı: ${channel.baslik || 'Bilinmeyen'}`,
                     // TV için gerekli olan alanlar
@@ -642,7 +642,7 @@ builder.defineMetaHandler(async function(args) {
                 id: args.id,
                 type: 'tv',
                 name: targetChannel.baslik || 'Bilinmeyen Kanal',
-                poster: targetChannel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                poster: targetChannel.icon || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
                 background: targetChannel.icon || undefined,
                 description: `Canlı TV Kanalı: ${targetChannel.baslik || 'Bilinmeyen'}`,
                 genres: ['TV', 'Live'],
