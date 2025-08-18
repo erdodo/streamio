@@ -129,7 +129,34 @@ class VideasyExtractor {
         try {
             console.log(`🎭 Puppeteer ile Videasy analizi başlıyor: ${tmdbId}`);
 
-            browser = await puppeteer.launch({
+            // ARM sistemler için Chrome/Chromium path'lerini dene
+            const possiblePaths = [
+                '/usr/bin/chromium-browser',
+                '/usr/bin/chromium',
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable',
+                '/snap/bin/chromium',
+                process.env.CHROME_BIN,
+                process.env.CHROMIUM_BIN
+            ].filter(Boolean);
+
+            let executablePath = null;
+
+            // System'de yüklü Chrome/Chromium'u bul
+            for (const path of possiblePaths) {
+                try {
+                    const fs = require('fs');
+                    if (fs.existsSync(path)) {
+                        executablePath = path;
+                        console.log(`🔍 Chrome/Chromium bulundu: ${path}`);
+                        break;
+                    }
+                } catch (e) {
+                    // Ignore
+                }
+            }
+
+            const launchOptions = {
                 headless: true,
                 args: [
                     '--no-sandbox',
@@ -138,9 +165,23 @@ class VideasyExtractor {
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
-                    '--disable-gpu'
+                    '--disable-gpu',
+                    '--disable-features=VizDisplayCompositor',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding'
                 ]
-            });
+            };
+
+            // Eğer system'de Chrome/Chromium varsa onu kullan
+            if (executablePath) {
+                launchOptions.executablePath = executablePath;
+                console.log(`🚀 System Chrome/Chromium kullanılıyor: ${executablePath}`);
+            } else {
+                console.log(`🚀 Puppeteer bundled Chrome kullanılıyor`);
+            }
+
+            browser = await puppeteer.launch(launchOptions);
 
             const page = await browser.newPage();
 
