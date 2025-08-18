@@ -14,9 +14,20 @@ const API_HEADERS = {
     'X-Hostname': 'app.erdoganyesil.org'
 };
 
+const API_HEADERS_ERDOFLIX = {
+    'accept': 'application/json',
+    'X-Locale': 'en-US',
+    'X-Role': 'root',
+    'X-Authenticator': 'basic',
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsInJvbGVOYW1lIjoicm9vdCIsImlhdCI6MTc1NTUxMzAxMywiZXhwIjozMzMxMzExMzAxM30.pdsffP79aEvVPYr3LlkRAC_CuRILSOXH0uZrhxUiE5s',
+    'X-App': 'erdoFlix',
+    'X-Timezone': '+03:00',
+    'X-Hostname': 'app.erdoganyesil.org'
+};
+
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.3.2",
+    "version": "1.3.3",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -141,7 +152,7 @@ async function fetchMovies(limit = 100, searchQuery = null, genreFilter = null) 
         if (genreFilter) console.log(`🎭 Tür filtresi: "${genreFilter}"`);
 
         const response = await axios.get(url, {
-            headers: API_HEADERS,
+            headers: API_HEADERS_ERDOFLIX,
             timeout: 15000
         });
 
@@ -194,7 +205,7 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
         }
 
         console.log(`${response.data.data.length} TV kanalı bulundu (gerçek TV API'sinden)`);
-        return response.data.data.slice(0, limit);
+        return response.data.data;
 
     } catch (error) {
         if (error.code === 'ECONNABORTED') {
