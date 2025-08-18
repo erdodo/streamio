@@ -16,7 +16,7 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.0.3",
+    "version": "1.0.4",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -33,7 +33,7 @@ const manifest = {
             "extra": [
                 {
                     "name": "genre",
-                    "options": ["aksiyon", "komedi", "dram", "korku", "bilim kurgu"],
+                    "options": ["aksiyon", "komedi", "dram", "korku", "bilim-kurgu", "gerilim", "romantik", "tarih", "aile", "suç"],
                     "isRequired": false
                 },
                 {
@@ -116,13 +116,37 @@ builder.defineCatalogHandler(async function(args) {
         const skip = parseInt(args.extra?.skip) || 0;
         const pageSize = args.id === 'erdoflix_top' ? 20 : 50; // Popüler için daha az
 
+        // Genre filtresi
+        let selectedGenre = args.extra?.genre;
+        // Browser'dan gelen extra parametreleri temizle
+        if (selectedGenre) {
+            selectedGenre = selectedGenre.split('.json')[0].split('?')[0];
+        }
+        console.log(`Genre filtresi: ${selectedGenre || 'Yok'}`);
+
         const movies = await fetchMovies(300);
-        console.log(`${movies.length} film alındı, catalog: ${args.id}, skip: ${skip}`);
+        console.log(`${movies.length} film alındı, catalog: ${args.id}, skip: ${skip}, genre: ${selectedGenre || 'Hepsi'}`);
+
+        // Genre filtresini uygula
+        let filteredMovies = movies;
+        if (selectedGenre) {
+            filteredMovies = movies.filter(movie => {
+                const movieGenres = movie.turler?.map(tur => tur.baslik.toLowerCase()) || [];
+                return movieGenres.some(genre =>
+                    genre.includes(selectedGenre.toLowerCase()) ||
+                    selectedGenre.toLowerCase().includes(genre) ||
+                    // Türkçe karakter desteği için
+                    genre.replace('ı', 'i').replace('ü', 'u').replace('ö', 'o').replace('ş', 's').replace('ç', 'c').replace('ğ', 'g').includes(selectedGenre.toLowerCase()) ||
+                    selectedGenre.toLowerCase().replace('ı', 'i').replace('ü', 'u').replace('ö', 'o').replace('ş', 's').replace('ç', 'c').replace('ğ', 'g').includes(genre)
+                );
+            });
+            console.log(`Genre "${selectedGenre}" filtresi uygulandı: ${filteredMovies.length} film kaldı`);
+        }
 
         // Popüler catalog için tersten sırala (en yeni önce)
         let processedMovies = args.id === 'erdoflix_top'
-            ? movies.slice().reverse()
-            : movies;
+            ? filteredMovies.slice().reverse()
+            : filteredMovies;
 
         // Sayfalama uygula
         const paginatedMovies = processedMovies.slice(skip, skip + pageSize);
