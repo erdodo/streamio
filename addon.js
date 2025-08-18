@@ -16,7 +16,7 @@ const API_HEADERS = {
 
 const manifest = {
     "id": "org.erdoganyesil.erdoflix",
-    "version": "1.3.0",
+    "version": "1.3.1",
 
     "name": "ErdoFlix M3U8 Addon",
     "description": "Erdogan Yesil API ile M3U8 kaynaklarını sunan Stremio addon'u",
@@ -166,54 +166,138 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
     try {
         console.log(`TV kanalları getiriliyor - arama: ${searchQuery || 'yok'}, limit: ${limit}`);
 
-        // Geçici olarak mock data kullan - gerçek endpoint'i kullanıcıdan soralım
-        console.log('⚠️ TV API endpoint bulunamadı, mock data kullanılıyor');
+        // Gerçek TV API endpoint'ini kullan
+        let apiUrl = `${API_BASE_URL}/tv_list`;
 
+        // Arama için filter parametresi ekle
+        if (searchQuery && searchQuery.length >= 2) {
+            const searchFilter = {
+                "$or": [
+                    {"baslik": {"$includes": searchQuery}}
+                ]
+            };
+            apiUrl += `?filter=${encodeURIComponent(JSON.stringify(searchFilter))}`;
+        }
+
+        // Sayfalama parametresi ekle
+        apiUrl += `${searchQuery ? '&' : '?'}pageSize=${limit}&sort=["id"]`;
+
+        console.log(`TV API URL: ${apiUrl}`);
+
+        const response = await axios.get(apiUrl, {
+            headers: API_HEADERS,
+            timeout: 15000
+        });
+
+        if (!response.data || !response.data.data || !Array.isArray(response.data.data)) {
+            console.log('TV kanalları verisi bulunamadı');
+            return [];
+        }
+
+        console.log(`${response.data.data.length} TV kanalı bulundu`);
+        return response.data.data.slice(0, limit);
+
+    } catch (error) {
+        if (error.code === 'ECONNABORTED') {
+            console.log('TV kanalları API timeout hatası');
+        } else if (error.code === 'ECONNREFUSED') {
+            console.log('TV kanalları API bağlantı hatası');
+        } else {
+            console.log(`TV kanalları API genel hatası: ${error.message}`);
+        }
+
+        // Hata durumunda fallback mock data
+        console.log('⚠️ TV API hatası, fallback mock data kullanılıyor');
         const mockChannels = [
             {
                 id: 1,
-                name: "TRT 1",
-                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=TRT1",
-                url1: "https://tv-trt1.medya.trt.com.tr/master.m3u8",
-                url2: "https://tv-trt1-dvr.medya.trt.com.tr/master.m3u8",
-                url3: null,
-                url4: null
+                baslik: "TRT 1",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=TRT1",
+                url_1: "https://tv-trt1.medya.trt.com.tr/master.m3u8",
+                url_2: "https://tv-trt1-dvr.medya.trt.com.tr/master.m3u8",
+                url_3: null,
+                url_4: null
             },
             {
                 id: 2,
-                name: "Kanal D",
-                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=KANALD",
-                url1: "https://demiroren-live.daioncdn.net/kanald/kanald.m3u8",
-                url2: null,
-                url3: null,
-                url4: null
+                baslik: "Kanal D",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=KANALD",
+                url_1: "https://demiroren-live.daioncdn.net/kanald/kanald.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
             },
             {
                 id: 3,
-                name: "Show TV",
-                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=SHOW",
-                url1: "https://ciner-live.daioncdn.net/showtv/showtv.m3u8",
-                url2: null,
-                url3: null,
-                url4: null
+                baslik: "Show TV",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=SHOW",
+                url_1: "https://ciner-live.daioncdn.net/showtv/showtv.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
             },
             {
                 id: 4,
-                name: "ATV",
-                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=ATV",
-                url1: "https://trkvz-live.daioncdn.net/atv/atv.m3u8",
-                url2: null,
-                url3: null,
-                url4: null
+                baslik: "ATV",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=ATV",
+                url_1: "https://trkvz-live.daioncdn.net/atv/atv.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
             },
             {
                 id: 5,
-                name: "Star TV",
-                logo: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=STAR",
-                url1: "https://dogus-live.daioncdn.net/startv/startv.m3u8",
-                url2: null,
-                url3: null,
-                url4: null
+                baslik: "Star TV",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=STAR",
+                url_1: "https://dogus-live.daioncdn.net/startv/startv.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
+            },
+            {
+                id: 6,
+                baslik: "TV8",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV8",
+                url_1: "https://tv8-live.daioncdn.net/tv8/tv8.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
+            },
+            {
+                id: 7,
+                baslik: "FOX",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=FOX",
+                url_1: "https://foxtv.blutv.com/blutv_foxtv_live/live.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
+            },
+            {
+                id: 8,
+                baslik: "CNN Türk",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=CNN",
+                url_1: "https://live.duhnet.tv/S2/HLS_LIVE/cnnturknp/track_4_1000/playlist.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
+            },
+            {
+                id: 9,
+                baslik: "NTV",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=NTV",
+                url_1: "https://dogus-live.daioncdn.net/ntv/ntv.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
+            },
+            {
+                id: 10,
+                baslik: "Habertürk",
+                icon: "https://via.placeholder.com/300x450/ff6b35/ffffff?text=HABER",
+                url_1: "https://tv.ensonhaber.com/haberturk/haberturk.m3u8",
+                url_2: null,
+                url_3: null,
+                url_4: null
             }
         ];
 
@@ -221,20 +305,14 @@ async function fetchTVChannels(limit = 100, searchQuery = null) {
 
         if (searchQuery && searchQuery.length >= 2) {
             filteredChannels = mockChannels.filter(channel =>
-                channel.name.toLowerCase().includes(searchQuery.toLowerCase())
+                channel.baslik.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
-        console.log(`${filteredChannels.length} TV kanalı bulundu (mock data)`);
+        console.log(`${filteredChannels.length} TV kanalı bulundu (fallback mock data)`);
         return filteredChannels.slice(0, limit);
-
-    } catch (error) {
-        console.log(`TV kanalları hatası: ${error.message}`);
-        return [];
     }
-}
-
-// M3U8 playlist'ini parse ederek embedded subtitles ve audio tracks bulur
+}// M3U8 playlist'ini parse ederek embedded subtitles ve audio tracks bulur
 async function parseM3U8(url) {
     try {
         console.log(`M3U8 parse ediliyor: ${url}`);
@@ -386,7 +464,7 @@ builder.defineCatalogHandler(async function(args) {
                     id: `ey${movie.id}`,
                     type: 'movie',
                     name: movie.baslik || movie.orjinal_baslik || 'Bilinmeyen Film',
-                    poster: movie.kapak_foto || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
+                    poster: movie.poster || 'https://via.placeholder.com/300x450/cccccc/666666?text=No+Image',
                     year: movie.yayin_yili,
                     genres: genres,
                     imdbRating: movie.imdb_puani || null
@@ -438,10 +516,10 @@ builder.defineCatalogHandler(async function(args) {
                 return {
                     id: `ey_tv_${channel.id || index}`,
                     type: 'tv',
-                    name: channel.name || 'Bilinmeyen Kanal',
-                    poster: channel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                    name: channel.baslik || 'Bilinmeyen Kanal',
+                    poster: channel.icon || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
                     genres: ['TV', 'Live'],
-                    description: `Canlı TV Kanalı: ${channel.name || 'Bilinmeyen'}`,
+                    description: `Canlı TV Kanalı: ${channel.baslik || 'Bilinmeyen'}`,
                     // TV için gerekli olan alanlar
                     year: new Date().getFullYear()
                 };
@@ -563,10 +641,10 @@ builder.defineMetaHandler(async function(args) {
             const meta = {
                 id: args.id,
                 type: 'tv',
-                name: targetChannel.name || 'Bilinmeyen Kanal',
-                poster: targetChannel.logo || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
-                background: targetChannel.logo || undefined,
-                description: `Canlı TV Kanalı: ${targetChannel.name || 'Bilinmeyen'}`,
+                name: targetChannel.baslik || 'Bilinmeyen Kanal',
+                poster: targetChannel.icon || 'https://via.placeholder.com/300x450/ff6b35/ffffff?text=TV',
+                background: targetChannel.icon || undefined,
+                description: `Canlı TV Kanalı: ${targetChannel.baslik || 'Bilinmeyen'}`,
                 genres: ['TV', 'Live'],
                 year: new Date().getFullYear(),
                 country: 'TR',
@@ -657,11 +735,23 @@ builder.defineStreamHandler(async function(args) {
                 // Embedded altyazıları ekle
                 if (m3u8Data.subtitles.length > 0) {
                     console.log(`📝 M3U8'den ${m3u8Data.subtitles.length} embedded altyazı bulundu`);
+                    const embeddedLangCounter = {}; // Aynı dildeki embedded altyazı sayısını takip et
+
                     for (const sub of m3u8Data.subtitles) {
+                        let lang = sub.lang || 'tr';
+
+                        // Aynı dilde birden fazla altyazı varsa suffix ekle
+                        if (embeddedLangCounter[lang]) {
+                            embeddedLangCounter[lang]++;
+                            lang = `${sub.lang || 'tr'}${embeddedLangCounter[sub.lang || 'tr']}`; // tr2, en2 gibi
+                        } else {
+                            embeddedLangCounter[sub.lang || 'tr'] = 1;
+                        }
+
                         stream.subtitles.push({
                             url: sub.url,
-                            lang: sub.lang || 'tr',
-                            label: sub.label || `${sub.lang || 'Türkçe'} (Embedded)`,
+                            lang: lang,
+                            label: sub.label || `${(sub.lang || 'Türkçe').toUpperCase()} (${embeddedLangCounter[sub.lang || 'tr'] || 1}) - Embedded`,
                             format: sub.format || 'vtt'
                         });
                     }
@@ -675,11 +765,23 @@ builder.defineStreamHandler(async function(args) {
             }
 
             // Harici altyazıları da ekle
+            const subtitleLangCounter = {}; // Aynı dildeki altyazı sayısını takip et
+
             for (const subtitle of subtitles) {
                 if (subtitle.url) {
+                    let lang = 'tr'; // Varsayılan Türkçe
+
+                    // Aynı dilde birden fazla altyazı varsa suffix ekle
+                    if (subtitleLangCounter[lang]) {
+                        subtitleLangCounter[lang]++;
+                        lang = `tr${subtitleLangCounter[lang]}`; // tr2, tr3, tr4 gibi
+                    } else {
+                        subtitleLangCounter[lang] = 1;
+                    }
+
                     const sub = {
                         url: subtitle.url,
-                        lang: 'tr' // Varsayılan Türkçe
+                        lang: lang
                     };
 
                     // VTT formatını belirt
@@ -690,9 +792,9 @@ builder.defineStreamHandler(async function(args) {
                     }
 
                     if (subtitle.baslik) {
-                        sub.label = subtitle.baslik;
+                        sub.label = `${subtitle.baslik} (${lang.toUpperCase()})`;
                     } else {
-                        sub.label = 'Türkçe (Harici)';
+                        sub.label = `Türkçe ${subtitleLangCounter['tr'] || 1} (Harici)`;
                     }
 
                     // Aynı altyazı zaten varsa ekleme
@@ -760,15 +862,15 @@ builder.defineStreamHandler(async function(args) {
                 return Promise.resolve({ streams: [] });
             }
 
-            console.log(`TV kanalı bulundu: ${targetChannel.name}`);
+            console.log(`TV kanalı bulundu: ${targetChannel.baslik}`);
             const streams = [];
 
             // Her URL'yi stream olarak ekle
-            if (targetChannel.url1) {
+            if (targetChannel.url_1) {
                 streams.push({
-                    name: `${targetChannel.name} - Kaynak 1`,
-                    title: `${targetChannel.name} (HD)`,
-                    url: targetChannel.url1,
+                    name: `${targetChannel.baslik} - Kaynak 1`,
+                    title: `${targetChannel.baslik} (HD)`,
+                    url: targetChannel.url_1,
                     ytId: null,
                     infoHash: null,
                     fileIdx: null,
@@ -781,11 +883,11 @@ builder.defineStreamHandler(async function(args) {
                 });
             }
 
-            if (targetChannel.url2) {
+            if (targetChannel.url_2) {
                 streams.push({
-                    name: `${targetChannel.name} - Kaynak 2`,
-                    title: `${targetChannel.name} (Alternatif)`,
-                    url: targetChannel.url2,
+                    name: `${targetChannel.baslik} - Kaynak 2`,
+                    title: `${targetChannel.baslik} (Alternatif)`,
+                    url: targetChannel.url_2,
                     ytId: null,
                     infoHash: null,
                     fileIdx: null,
@@ -798,11 +900,11 @@ builder.defineStreamHandler(async function(args) {
                 });
             }
 
-            if (targetChannel.url3) {
+            if (targetChannel.url_3) {
                 streams.push({
-                    name: `${targetChannel.name} - Kaynak 3`,
-                    title: `${targetChannel.name} (Yedek)`,
-                    url: targetChannel.url3,
+                    name: `${targetChannel.baslik} - Kaynak 3`,
+                    title: `${targetChannel.baslik} (Yedek)`,
+                    url: targetChannel.url_3,
                     ytId: null,
                     infoHash: null,
                     fileIdx: null,
@@ -815,11 +917,11 @@ builder.defineStreamHandler(async function(args) {
                 });
             }
 
-            if (targetChannel.url4) {
+            if (targetChannel.url_4) {
                 streams.push({
-                    name: `${targetChannel.name} - Kaynak 4`,
-                    title: `${targetChannel.name} (Mobil)`,
-                    url: targetChannel.url4,
+                    name: `${targetChannel.baslik} - Kaynak 4`,
+                    title: `${targetChannel.baslik} (Mobil)`,
+                    url: targetChannel.url_4,
                     ytId: null,
                     infoHash: null,
                     fileIdx: null,
